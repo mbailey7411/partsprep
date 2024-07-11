@@ -34,7 +34,6 @@
             border-radius: 4px;
             cursor: pointer;
             margin-right: 10px;
-            margin-bottom: 10px;
         }
         button:hover {
             background-color: #45a049;
@@ -45,179 +44,123 @@
             background-color: #e7f3fe;
             border-left: 6px solid #2196F3;
         }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
         #qrcode {
             margin-top: 20px;
             text-align: center;
         }
     </style>
+    <script src="https://apis.google.com/js/api.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>CSV Processor and Checklist Generator</h1>
         <input type="file" id="fileInput" accept=".csv">
-        <button id="downloadBtn" style="display: none;">Download Processed CSV</button>
-        <button id="generateGoogleSheetBtn" style="display: none;">Update Google Sheet</button>
+        <button id="processBtn">Process CSV</button>
+        <button id="generateBtn" style="display: none;">Generate Checklist</button>
         <div id="output"></div>
-        <div id="preview"></div>
         <div id="qrcode"></div>
         <p>Google Sheet Link: <a href="https://docs.google.com/spreadsheets/d/1vYnNgZYoj8msRDNND9SkWCLd4mgFePxksavNFG7knxQ/edit?usp=sharing" target="_blank">Open Sheet</a></p>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
     <script>
-        let processedCsv = null;
+        // Google Sheets API configuration
+        const API_KEY = 'YOUR_API_KEY';
+        const SHEET_ID = '1vYnNgZYoj8msRDNND9SkWCLd4mgFePxksavNFG7knxQ';
+        const RANGE = 'Sheet1!A:C';
+
         let processedData = null;
 
-        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
-        document.getElementById('downloadBtn').addEventListener('click', downloadCsv);
-        document.getElementById('generateGoogleSheetBtn').addEventListener('click', generateGoogleSheet);
+        document.getElementById('processBtn').addEventListener('click', processCSV);
+        document.getElementById('generateBtn').addEventListener('click', generateChecklist);
 
         // Generate QR code
         new QRCode(document.getElementById("qrcode"), "https://docs.google.com/spreadsheets/d/1vYnNgZYoj8msRDNND9SkWCLd4mgFePxksavNFG7knxQ/edit?usp=sharing");
 
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            Papa.parse(file, {
-                complete: function(results) {
-                    processData(results.data);
-                },
-                error: function(error) {
-                    console.error('Error parsing CSV:', error);
-                    document.getElementById('output').innerHTML = 'Error parsing CSV file. Please check the file and try again.';
-                }
-            });
+        function processCSV() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (file) {
+                Papa.parse(file, {
+                    complete: function(results) {
+                        processData(results.data);
+                    }
+                });
+            } else {
+                document.getElementById('output').innerHTML = 'Please select a CSV file.';
+            }
         }
 
         function processData(data) {
-            try {
-                // Find the indices of the required columns
-                const headers = data[0];
-                const installNotesIndex = headers.indexOf('Install Notes');
-                const partsIndex = headers.indexOf('Parts');
-                const jobNumberIndex = headers.indexOf('Job #');
+            // Find the indices of the required columns
+            const headers = data[0];
+            const installNotesIndex = headers.indexOf('Install Notes');
+            const partsIndex = headers.indexOf('Parts');
+            const jobNumberIndex = headers.indexOf('Job #');
 
-                if (installNotesIndex === -1 || partsIndex === -1 || jobNumberIndex === -1) {
-                    throw new Error('Required columns not found in CSV');
-                }
-
-                // Filter and process the data
-                processedData = data.slice(1).map(row => {
-                    const installNotes = row[installNotesIndex] || '';
-                    const parts = row[partsIndex] ? processParts(row[partsIndex]) : '';
-                    const jobNumber = row[jobNumberIndex] || '';
-                    return [installNotes, parts, jobNumber];
-                }).filter(row => row.some(cell => cell !== '')); // Remove rows where all cells are empty
-
-                // Sort by Install Notes column
-                processedData.sort((a, b) => a[0].localeCompare(b[0]));
-
-                // Add headers to the processed data
-                processedData.unshift(['Install Notes', 'Parts', 'Job #']);
-
-                // Generate CSV content
-                processedCsv = Papa.unparse(processedData);
-
-                // Show download and generate Google Sheet buttons
-                document.getElementById('downloadBtn').style.display = 'block';
-                document.getElementById('generateGoogleSheetBtn').style.display = 'block';
-                document.getElementById('output').innerHTML = 'CSV processed successfully. Click the download button to save the file or update the Google Sheet.';
-
-                // Show preview
-                showPreview(processedData);
-            } catch (error) {
-                console.error('Error processing data:', error);
-                document.getElementById('output').innerHTML = 'Error processing CSV data: ' + error.message;
+            if (installNotesIndex === -1 || partsIndex === -1 || jobNumberIndex === -1) {
+                document.getElementById('output').innerHTML = 'Required columns not found in CSV.';
+                return;
             }
+
+            // Filter and process the data
+            processedData = data.slice(1).map(row => {
+                const installNotes = row[installNotesIndex] || '';
+                const parts = row[partsIndex] ? processParts(row[partsIndex]) : '';
+                const jobNumber = row[jobNumberIndex] || '';
+                return [installNotes, parts, jobNumber];
+            }).filter(row => row.some(cell => cell !== '')); // Remove rows where all cells are empty
+
+            // Sort by Install Notes column
+            processedData.sort((a, b) => a[0].localeCompare(b[0]));
+
+            document.getElementById('output').innerHTML = 'CSV processed successfully.';
+            document.getElementById('generateBtn').style.display = 'block';
         }
 
         function processParts(partsString) {
-            // Remove HAH combinations in various scenarios
-            const cleanedString = partsString
-                .replace(/\b(HAH\w+)\b/g, '')  // Remove HAH followed by alphanumeric characters
-                .replace(/\s+/g, ' ')          // Remove any double spaces
-                .replace(/,\s*,/g, ',')        // Remove empty entries (comma followed by comma)
-                .replace(/^,|,$/g, '')         // Remove leading/trailing commas
-                .trim();                       // Trim leading/trailing spaces
-            
-            // Split the cleaned string by commas
-            const parts = cleanedString.split(',');
-            
-            // Trim whitespace from each part and filter out empty parts
-            const filteredParts = parts
+            // Remove HAH combinations
+            return partsString.replace(/\b(HAH\w+)\b/g, '').split(',')
                 .map(part => part.trim())
-                .filter(part => part !== '');
-            
-            // Join the filtered parts back into a string
-            return filteredParts.join(', ');
+                .filter(part => part !== '')
+                .join(', ');
         }
 
-        function showPreview(data) {
-            const previewElement = document.getElementById('preview');
-            const table = document.createElement('table');
-            const headerRow = table.insertRow();
-            data[0].forEach(header => {
-                const th = document.createElement('th');
-                th.textContent = header;
-                headerRow.appendChild(th);
-            });
-            data.slice(1).forEach(row => {
-                const tr = table.insertRow();
-                row.forEach(cell => {
-                    const td = tr.insertCell();
-                    td.textContent = cell;
-                });
-            });
-            previewElement.innerHTML = '';
-            previewElement.appendChild(table);
-        }
-
-        function downloadCsv() {
-            if (processedCsv) {
-                const blob = new Blob([processedCsv], { type: 'text/csv;charset=utf-8;' });
-                saveAs(blob, 'processed_data.csv');
-            } else {
-                document.getElementById('output').innerHTML = 'No processed CSV data available. Please upload and process a CSV file first.';
+        function generateChecklist() {
+            if (!processedData) {
+                document.getElementById('output').innerHTML = 'Please process a CSV file first.';
+                return;
             }
+
+            gapi.load('client', initClient);
         }
 
-        function generateGoogleSheet() {
-            if (processedData) {
-                document.getElementById('output').innerHTML = 'Updating Google Sheet...';
-                
-                // Call the Google Apps Script web app
-                fetch('https://script.google.com/macros/s/YOUR_GOOGLE_APPS_SCRIPT_ID/exec', {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(processedData)
-                })
-                .then(response => {
-                    document.getElementById('output').innerHTML = 'Google Sheet updated successfully!';
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('output').innerHTML = 'Error updating Google Sheet. Please try again.';
-                });
-            } else {
-                document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
-            }
+        function initClient() {
+            gapi.client.init({
+                apiKey: API_KEY,
+                discoveryDocs: ["https://sheets.googleapis.com/$discovery/rest?version=v4"],
+            }).then(function () {
+                updateSheet();
+            }, function(error) {
+                document.getElementById('output').innerHTML = 'Error initializing Google Sheets API: ' + error.details;
+            });
+        }
+
+        function updateSheet() {
+            gapi.client.sheets.spreadsheets.values.update({
+                spreadsheetId: SHEET_ID,
+                range: RANGE,
+                valueInputOption: 'RAW',
+                resource: {
+                    values: [['Install Notes', 'Parts', 'Job #'], ...processedData]
+                }
+            }).then(function(response) {
+                document.getElementById('output').innerHTML = 'Checklist generated and updated in Google Sheets.';
+            }, function(response) {
+                document.getElementById('output').innerHTML = 'Error updating sheet: ' + response.result.error.message;
+            });
         }
     </script>
 </body>
