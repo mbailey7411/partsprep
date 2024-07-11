@@ -1,73 +1,262 @@
 <!DOCTYPE html>
 <html lang="en">
-<!-- ... (previous head and body content remains the same) ... -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Processor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        input[type="file"] {
+            display: block;
+            margin: 20px auto;
+        }
+        button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #output, #preview {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .parts-list {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .parts-list li {
+            margin-bottom: 5px;
+        }
+        #codeOutput {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        #codeInput {
+            display: block;
+            margin: 20px auto;
+            padding: 10px;
+            font-size: 18px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CSV Processor</h1>
+        <input type="file" id="fileInput" accept=".csv">
+        <button id="downloadBtn" style="display: none;">Download Processed CSV</button>
+        <button id="generateCodeBtn" style="display: none;">Generate Code</button>
+        <div id="codeOutput"></div>
+        <input type="text" id="codeInput" placeholder="Enter code" style="display: none;">
+        <button id="loadDataBtn" style="display: none;">Load Data</button>
+        <button id="saveProgressBtn" style="display: none;">Save Progress</button>
+        <div id="output"></div>
+        <div id="preview"></div>
+    </div>
 
-<script>
-    // ... (previous functions remain the same) ...
+    <script>
+        let processedCsv = null;
+        let processedData = null;
 
-    function generateQRCode() {
-        console.log("generateQRCode function called");
-        if (processedData) {
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        document.getElementById('downloadBtn').addEventListener('click', downloadCsv);
+        document.getElementById('generateCodeBtn').addEventListener('click', generateCode);
+        document.getElementById('loadDataBtn').addEventListener('click', loadData);
+        document.getElementById('saveProgressBtn').addEventListener('click', saveProgress);
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            Papa.parse(file, {
+                complete: function(results) {
+                    processData(results.data);
+                },
+                error: function(error) {
+                    console.error('Error parsing CSV:', error);
+                    document.getElementById('output').innerHTML = 'Error parsing CSV file. Please check the file and try again.';
+                }
+            });
+        }
+
+        function processData(data) {
             try {
-                console.log("Processed data available:", processedData);
-                
-                // Convert the processed data to a JSON string
-                const jsonData = JSON.stringify(processedData);
-                console.log("JSON data length:", jsonData.length);
-                
-                // Encode the JSON string using encodeURIComponent
-                const encodedData = encodeURIComponent(jsonData);
-                console.log("Encoded data length:", encodedData.length);
-                
-                // Create the share URL with the encoded data
-                const shareUrl = `https://mbailey7411.github.io/mobile-checklist/?data=${encodedData}`;
-                console.log("Share URL length:", shareUrl.length);
-                
-                // Generate QR code using qrcode-generator library
-                const qr = qrcode(0, 'L');
-                qr.addData(shareUrl);
-                qr.make();
-                const qrCodeImg = qr.createImgTag(5);
-                
-                // Display QR code
-                const qrcodeElement = document.getElementById("qrcode");
-                if (!qrcodeElement) {
-                    throw new Error("QR code element not found");
+                // Find the indices of the required columns
+                const headers = data[0];
+                const installNotesIndex = headers.indexOf('Install Notes');
+                const partsIndex = headers.indexOf('Parts');
+                const jobNumberIndex = headers.indexOf('Job #');
+
+                if (installNotesIndex === -1 || partsIndex === -1 || jobNumberIndex === -1) {
+                    throw new Error('Required columns not found in CSV');
                 }
-                qrcodeElement.innerHTML = qrCodeImg;
-                
-                // Display share link
-                const shareLinkElement = document.getElementById('shareLink');
-                if (shareLinkElement) {
-                    shareLinkElement.innerHTML = `<p>Or use this link: <a href="${shareUrl}" target="_blank">${shareUrl}</a></p>`;
-                    shareLinkElement.style.display = 'block';
-                } else {
-                    console.warn("Share link element not found");
-                }
-                
-                document.getElementById('output').innerHTML = 'QR Code generated successfully. Scan it with a mobile device or use the provided link.';
+
+                // Filter and process the data
+                processedData = data.slice(1).map(row => {
+                    const installNotes = row[installNotesIndex] || '';
+                    const parts = row[partsIndex] ? processParts(row[partsIndex]) : '';
+                    const jobNumber = row[jobNumberIndex] || '';
+                    return [false, installNotes, parts, jobNumber]; // Use false for unchecked items
+                }).filter(row => row.slice(1).some(cell => cell !== '')); // Remove rows where all cells (except checkbox) are empty
+
+                // Sort by Install Notes column
+                processedData.sort((a, b) => a[1].localeCompare(b[1]));
+
+                // Add headers to the processed data
+                processedData.unshift(['Checked', 'Install Notes', 'Parts', 'Job #']);
+
+                // Generate CSV content
+                processedCsv = Papa.unparse(processedData);
+
+                // Show buttons
+                document.getElementById('downloadBtn').style.display = 'block';
+                document.getElementById('generateCodeBtn').style.display = 'block';
+                document.getElementById('output').innerHTML = 'CSV processed successfully. Click the download button to save the file or generate a code for mobile access.';
+
+                // Show preview
+                showPreview(processedData);
             } catch (error) {
-                console.error("Error generating QR code:", error);
-                document.getElementById('output').innerHTML = 'Error generating QR code: ' + error.message;
+                console.error('Error processing data:', error);
+                document.getElementById('output').innerHTML = 'Error processing CSV data: ' + error.message;
             }
-        } else {
-            console.log("No processed data available");
-            document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
         }
-    }
 
-    // ... (rest of the script remains the same) ...
-
-    // Update the mobile checklist page handler
-    if (window.location.href.includes('mobile-checklist')) {
-        const urlParams = new URLSearchParams(window.location.search);
-        const encodedData = urlParams.get('data');
-        if (encodedData) {
-            const jsonData = decodeURIComponent(encodedData);
-            processedData = JSON.parse(jsonData);
-            showPreview(processedData);
+        function processParts(partsString) {
+            const parts = partsString.split(',').map(part => part.trim());
+            return parts.filter(part => part !== '').join(', ');
         }
-    }
-</script>
+
+        function showPreview(data) {
+            const previewElement = document.getElementById('preview');
+            const table = document.createElement('table');
+            const headerRow = table.insertRow();
+            data[0].forEach((header) => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            data.slice(1).forEach((row, rowIndex) => {
+                const tr = table.insertRow();
+                row.forEach((cell, cellIndex) => {
+                    const td = tr.insertCell();
+                    if (cellIndex === 0) {
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.checked = cell === true || cell === 'true';
+                        checkbox.addEventListener('change', (e) => {
+                            processedData[rowIndex + 1][0] = e.target.checked;
+                        });
+                        td.appendChild(checkbox);
+                    } else if (cellIndex === 2) { // Parts column
+                        const partsList = document.createElement('ul');
+                        partsList.className = 'parts-list';
+                        cell.split(', ').forEach(part => {
+                            const li = document.createElement('li');
+                            li.textContent = part;
+                            partsList.appendChild(li);
+                        });
+                        td.appendChild(partsList);
+                    } else {
+                        td.textContent = cell;
+                    }
+                });
+            });
+            previewElement.innerHTML = '';
+            previewElement.appendChild(table);
+        }
+
+        function downloadCsv() {
+            if (processedCsv) {
+                const blob = new Blob([processedCsv], { type: 'text/csv;charset=utf-8;' });
+                saveAs(blob, 'processed_data.csv');
+            } else {
+                document.getElementById('output').innerHTML = 'No processed CSV data available. Please upload and process a CSV file first.';
+            }
+        }
+
+        function generateCode() {
+            if (processedData) {
+                const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+                localStorage.setItem(code, JSON.stringify(processedData));
+                document.getElementById('codeOutput').innerHTML = `Your code: ${code}`;
+                document.getElementById('output').innerHTML = 'Code generated. Use this code on your mobile device to access the checklist.';
+            } else {
+                document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
+            }
+        }
+
+        function loadData() {
+            const code = document.getElementById('codeInput').value.trim().toUpperCase();
+            const data = localStorage.getItem(code);
+            if (data) {
+                processedData = JSON.parse(data);
+                showPreview(processedData);
+                document.getElementById('saveProgressBtn').style.display = 'block';
+                document.getElementById('output').innerHTML = 'Data loaded successfully. You can now check off items and save your progress.';
+            } else {
+                document.getElementById('output').innerHTML = 'Invalid code. Please try again.';
+            }
+        }
+
+        function saveProgress() {
+            if (processedData) {
+                const code = document.getElementById('codeInput').value.trim().toUpperCase();
+                localStorage.setItem(code, JSON.stringify(processedData));
+                document.getElementById('output').innerHTML = 'Progress saved successfully. You can now close this page and continue later using the same code.';
+            } else {
+                document.getElementById('output').innerHTML = 'No data to save. Please load data first.';
+            }
+        }
+
+        // Check if we're on a mobile device
+        if (/Mobi|Android/i.test(navigator.userAgent)) {
+            document.getElementById('fileInput').style.display = 'none';
+            document.getElementById('downloadBtn').style.display = 'none';
+            document.getElementById('generateCodeBtn').style.display = 'none';
+            document.getElementById('codeInput').style.display = 'block';
+            document.getElementById('loadDataBtn').style.display = 'block';
+        }
+    </script>
 </body>
 </html>
