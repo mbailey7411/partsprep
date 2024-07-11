@@ -69,7 +69,7 @@
         <h1>CSV Processor and Checklist Generator</h1>
         <input type="file" id="fileInput" accept=".csv">
         <button id="downloadBtn" style="display: none;">Download Processed CSV</button>
-        <button id="generateGoogleSheetBtn" style="display: none;">Generate Google Sheet</button>
+        <button id="generateGoogleSheetBtn" style="display: none;">Update Google Sheet</button>
         <div id="output"></div>
         <div id="preview"></div>
         <div id="qrcode"></div>
@@ -135,7 +135,7 @@
                 // Show download and generate Google Sheet buttons
                 document.getElementById('downloadBtn').style.display = 'block';
                 document.getElementById('generateGoogleSheetBtn').style.display = 'block';
-                document.getElementById('output').innerHTML = 'CSV processed successfully. Click the download button to save the file or create a Google Sheet.';
+                document.getElementById('output').innerHTML = 'CSV processed successfully. Click the download button to save the file or update the Google Sheet.';
 
                 // Show preview
                 showPreview(processedData);
@@ -197,8 +197,24 @@
 
         function generateGoogleSheet() {
             if (processedData) {
-                document.getElementById('output').innerHTML = 'Opening Google Sheet...';
-                window.open('https://docs.google.com/spreadsheets/d/1vYnNgZYoj8msRDNND9SkWCLd4mgFePxksavNFG7knxQ/edit?usp=sharing', '_blank');
+                document.getElementById('output').innerHTML = 'Updating Google Sheet...';
+                
+                // Call the Google Apps Script web app
+                fetch('https://script.google.com/macros/s/YOUR_GOOGLE_APPS_SCRIPT_ID/exec', {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(processedData)
+                })
+                .then(response => {
+                    document.getElementById('output').innerHTML = 'Google Sheet updated successfully!';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('output').innerHTML = 'Error updating Google Sheet. Please try again.';
+                });
             } else {
                 document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
             }
