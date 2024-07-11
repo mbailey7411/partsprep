@@ -58,6 +58,10 @@
         th {
             background-color: #f2f2f2;
         }
+        #qrcode {
+            margin-top: 20px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -68,10 +72,13 @@
         <button id="generateGoogleSheetBtn" style="display: none;">Generate Google Sheet</button>
         <div id="output"></div>
         <div id="preview"></div>
+        <div id="qrcode"></div>
+        <p>Google Sheet Link: <a href="https://docs.google.com/spreadsheets/d/1vYnNgZYoj8msRDNND9SkWCLd4mgFePxksavNFG7knxQ/edit?usp=sharing" target="_blank">Open Sheet</a></p>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
     <script>
         let processedCsv = null;
         let processedData = null;
@@ -79,6 +86,9 @@
         document.getElementById('fileInput').addEventListener('change', handleFileSelect);
         document.getElementById('downloadBtn').addEventListener('click', downloadCsv);
         document.getElementById('generateGoogleSheetBtn').addEventListener('click', generateGoogleSheet);
+
+        // Generate QR code
+        new QRCode(document.getElementById("qrcode"), "https://docs.google.com/spreadsheets/d/1vYnNgZYoj8msRDNND9SkWCLd4mgFePxksavNFG7knxQ/edit?usp=sharing");
 
         function handleFileSelect(event) {
             const file = event.target.files[0];
@@ -110,14 +120,14 @@
                     const installNotes = row[installNotesIndex] || '';
                     const parts = row[partsIndex] ? processParts(row[partsIndex]) : '';
                     const jobNumber = row[jobNumberIndex] || '';
-                    return ['', installNotes, parts, jobNumber]; // Add empty string for checkbox column
-                }).filter(row => row.slice(1).some(cell => cell !== '')); // Remove rows where all cells (except checkbox) are empty
+                    return [installNotes, parts, jobNumber];
+                }).filter(row => row.some(cell => cell !== '')); // Remove rows where all cells are empty
 
                 // Sort by Install Notes column
-                processedData.sort((a, b) => a[1].localeCompare(b[1]));
+                processedData.sort((a, b) => a[0].localeCompare(b[0]));
 
                 // Add headers to the processed data
-                processedData.unshift(['', 'Install Notes', 'Parts', 'Job #']);
+                processedData.unshift(['Install Notes', 'Parts', 'Job #']);
 
                 // Generate CSV content
                 processedCsv = Papa.unparse(processedData);
@@ -160,22 +170,16 @@
             const previewElement = document.getElementById('preview');
             const table = document.createElement('table');
             const headerRow = table.insertRow();
-            data[0].forEach((header, index) => {
+            data[0].forEach(header => {
                 const th = document.createElement('th');
-                th.textContent = index === 0 ? 'Check' : header;
+                th.textContent = header;
                 headerRow.appendChild(th);
             });
             data.slice(1).forEach(row => {
                 const tr = table.insertRow();
-                row.forEach((cell, index) => {
+                row.forEach(cell => {
                     const td = tr.insertCell();
-                    if (index === 0) {
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        td.appendChild(checkbox);
-                    } else {
-                        td.textContent = cell;
-                    }
+                    td.textContent = cell;
                 });
             });
             previewElement.innerHTML = '';
@@ -193,43 +197,8 @@
 
         function generateGoogleSheet() {
             if (processedData) {
-                document.getElementById('output').innerHTML = 'Creating Google Sheet... Please wait.';
-                
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = 'https://script.google.com/macros/s/AKfycbzlYiKKB2v6oWbYHhgvZl0qGk4_kZRF8JAtRqGK_NP9nDY7LDN-pdhgT0hMl5DbKaxDxg/exec';
-                form.target = 'hidden_iframe';
-
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'data';
-                input.value = JSON.stringify(processedData);
-
-                form.appendChild(input);
-                document.body.appendChild(form);
-
-                const iframe = document.createElement('iframe');
-                iframe.name = 'hidden_iframe';
-                iframe.style.display = 'none';
-                document.body.appendChild(iframe);
-
-                iframe.onload = function() {
-                    const sheetUrl = iframe.contentWindow.location.href;
-                    const sheetId = new URLSearchParams(new URL(sheetUrl).search).get('sheetId');
-                    
-                    if (sheetId) {
-                        const sheetLink = `https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=0`;
-                        document.getElementById('output').innerHTML = `Google Sheet created successfully! <a href="${sheetLink}" target="_blank">Open Sheet</a>`;
-                    } else {
-                        document.getElementById('output').innerHTML = 'Error: Unable to retrieve Google Sheet ID.';
-                    }
-                    
-                    // Clean up
-                    document.body.removeChild(form);
-                    document.body.removeChild(iframe);
-                };
-
-                form.submit();
+                document.getElementById('output').innerHTML = 'Opening Google Sheet...';
+                window.open('https://docs.google.com/spreadsheets/d/1vYnNgZYoj8msRDNND9SkWCLd4mgFePxksavNFG7knxQ/edit?usp=sharing', '_blank');
             } else {
                 document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
             }
