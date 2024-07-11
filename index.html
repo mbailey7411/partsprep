@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSV to Google Sheet Converter</title>
+    <title>CSV Processor and Checklist Generator</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -33,70 +33,243 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
         }
         button:hover {
             background-color: #45a049;
         }
-        #result {
+        #output, #shareText {
             margin-top: 20px;
             padding: 10px;
             background-color: #e7f3fe;
             border-left: 6px solid #2196F3;
         }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>CSV to Google Sheet Converter</h1>
+        <h1>CSV Processor and Checklist Generator</h1>
         <input type="file" id="fileInput" accept=".csv">
-        <button onclick="processFile()">Generate Google Sheet</button>
-        <div id="result"></div>
+        <button id="downloadBtn" style="display: none;">Download Processed CSV</button>
+        <button id="generateShareTextBtn" style="display: none;">Generate Share Text</button>
+        <button id="generateGoogleSheetBtn" style="display: none;">Generate Google Sheet</button>
+        <div id="output"></div>
+        <div id="shareText"></div>
+        <div id="preview"></div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script>
-        function processFile() {
-            const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
+        let processedCsv = null;
+        let processedData = null;
 
-            if (!file) {
-                alert('Please select a CSV file first.');
-                return;
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        document.getElementById('downloadBtn').addEventListener('click', downloadCsv);
+        document.getElementById('generateShareTextBtn').addEventListener('click', generateShareText);
+        document.getElementById('generateGoogleSheetBtn').addEventListener('click', generateGoogleSheet);
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            Papa.parse(file, {
+                complete: function(results) {
+                    processData(results.data);
+                },
+                error: function(error) {
+                    console.error('Error parsing CSV:', error);
+                    document.getElementById('output').innerHTML = 'Error parsing CSV file. Please check the file and try again.';
+                }
+            });
+        }
+
+        function processData(data) {
+            try {
+                // Find the indices of the required columns
+                const headers = data[0];
+                const installNotesIndex = headers.indexOf('Install Notes');
+                const partsIndex = headers.indexOf('Parts');
+                const jobNumberIndex = headers.indexOf('Job #');
+
+                if (installNotesIndex === -1 || partsIndex === -1 || jobNumberIndex === -1) {
+                    throw new Error('Required columns not found in CSV');
+                }
+
+                // Filter and process the data
+                processedData = data.slice(1).map(row => {
+                    const installNotes = row[installNotesIndex] || '';
+                    const parts = row[partsIndex] ? processParts(row[partsIndex]) : '';
+                    const jobNumber = row[jobNumberIndex] || '';
+                    return ['', installNotes, parts, jobNumber]; // Add empty string for checkbox column
+                }).filter(row => row.slice(1).some(cell => cell !== '')); // Remove rows where all cells (except checkbox) are empty
+
+                // Sort by Install Notes column
+                processedData.sort((a, b) => a[1].localeCompare(b[1]));
+
+                // Add headers to the processed data
+                processedData.unshift(['', 'Install Notes', 'Parts', 'Job #']);
+
+                // Generate CSV content
+                processedCsv = Papa.unparse(processedData);
+
+                // Show download, share text, and generate Google Sheet buttons
+                document.getElementById('downloadBtn').style.display = 'block';
+                document.getElementById('generateShareTextBtn').style.display = 'block';
+                document.getElementById('generateGoogleSheetBtn').style.display = 'block';
+                document.getElementById('output').innerHTML = 'CSV processed successfully. Click the download button to save the file, generate share text for mobile access, or create a Google Sheet.';
+
+                // Show preview
+                showPreview(processedData);
+            } catch (error) {
+                console.error('Error processing data:', error);
+                document.getElementById('output').innerHTML = 'Error processing CSV data: ' + error.message;
             }
+        }
 
-            const reader = new FileReader();
+        function processParts(partsString) {
+            // Remove HAH combinations in various scenarios
+            const cleanedString = partsString
+                .replace(/\b(HAH\w+)\b/g, '')  // Remove HAH followed by alphanumeric characters
+                .replace(/\s+/g, ' ')          // Remove any double spaces
+                .replace(/,\s*,/g, ',')        // Remove empty entries (comma followed by comma)
+                .replace(/^,|,$/g, '')         // Remove leading/trailing commas
+                .trim();                       // Trim leading/trailing spaces
+            
+            // Split the cleaned string by commas
+            const parts = cleanedString.split(',');
+            
+            // Trim whitespace from each part and filter out empty parts
+            const filteredParts = parts
+                .map(part => part.trim())
+                .filter(part => part !== '');
+            
+            // Join the filtered parts back into a string
+            return filteredParts.join(', ');
+        }
 
-            reader.onload = function(e) {
-                const csvData = e.target.result;
-                const lines = csvData.split('\n');
-                const result = lines.map(line => line.split(','));
+        function showPreview(data) {
+            const previewElement = document.getElementById('preview');
+            const table = document.createElement('table');
+            const headerRow = table.insertRow();
+            data[0].forEach((header, index) => {
+                const th = document.createElement('th');
+                th.textContent = index === 0 ? 'Check' : header;
+                headerRow.appendChild(th);
+            });
+            data.slice(1).forEach(row => {
+                const tr = table.insertRow();
+                row.forEach((cell, index) => {
+                    const td = tr.insertCell();
+                    if (index === 0) {
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        td.appendChild(checkbox);
+                    } else {
+                        td.textContent = cell;
+                    }
+                });
+            });
+            previewElement.innerHTML = '';
+            previewElement.appendChild(table);
+        }
 
+        function downloadCsv() {
+            if (processedCsv) {
+                const blob = new Blob([processedCsv], { type: 'text/csv;charset=utf-8;' });
+                saveAs(blob, 'processed_data.csv');
+            } else {
+                document.getElementById('output').innerHTML = 'No processed CSV data available. Please upload and process a CSV file first.';
+            }
+        }
+
+        function generateShareText() {
+            if (processedData) {
+                try {
+                    // Convert the processed data to a JSON string
+                    const jsonData = JSON.stringify(processedData);
+                    
+                    // Encode the JSON string to base64
+                    const encodedData = btoa(jsonData);
+                    
+                    // Create the share URL with the encoded data
+                    const shareUrl = `https://mbailey7411.github.io/mobile-checklist/?data=${encodeURIComponent(encodedData)}`;
+                    
+                    // Display share link
+                    const shareTextElement = document.getElementById('shareText');
+                    shareTextElement.innerHTML = `
+                        <p>Copy and share this text:</p>
+                        <textarea rows="4" cols="50" readonly>${shareUrl}</textarea>
+                        <p>Instructions: Copy the above text and send it to the recipient. They can paste it into their browser to view the checklist.</p>
+                    `;
+                    
+                    document.getElementById('output').innerHTML = 'Share text generated successfully. Copy and share the text above.';
+                } catch (error) {
+                    console.error("Error generating share text:", error);
+                    document.getElementById('output').innerHTML = 'Error generating share text: ' + error.message;
+                }
+            } else {
+                document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
+            }
+        }
+
+        function generateGoogleSheet() {
+            if (processedData) {
                 fetch('https://script.google.com/macros/s/AKfycby3qyrU3ATqfVDyXNo0Lqm6QUx51TSOcQK4UlDnr9OTX-fZVHxJflcgfhO4Mxy1kYAmXA/exec', {
                     method: 'POST',
                     mode: 'no-cors',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
                     },
-                    body: `action=create&data=${encodeURIComponent(JSON.stringify(result))}`
+                    body: `action=create&data=${encodeURIComponent(JSON.stringify(processedData))}`
                 })
                 .then(response => response.text())
                 .then(data => {
                     try {
                         const jsonData = JSON.parse(data);
                         if (jsonData.sheetId) {
-                            document.getElementById('result').innerHTML = `Google Sheet created successfully! <a href="https://docs.google.com/spreadsheets/d/${jsonData.sheetId}" target="_blank">Open Sheet</a>`;
+                            document.getElementById('output').innerHTML = `Google Sheet created successfully! <a href="https://docs.google.com/spreadsheets/d/${jsonData.sheetId}" target="_blank">Open Sheet</a>`;
                         } else if (jsonData.error) {
-                            document.getElementById('result').innerHTML = `Error: ${jsonData.error}`;
+                            document.getElementById('output').innerHTML = `Error: ${jsonData.error}`;
                         }
                     } catch (error) {
-                        document.getElementById('result').innerHTML = 'Error: Unable to parse response from server.';
+                        document.getElementById('output').innerHTML = 'Error: Unable to parse response from server.';
                     }
                 })
                 .catch(error => {
-                    document.getElementById('result').innerHTML = `Error: ${error.message}`;
+                    document.getElementById('output').innerHTML = `Error: ${error.message}`;
                 });
-            };
+            } else {
+                document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
+            }
+        }
 
-            reader.readAsText(file);
+        // Check if we're on the mobile checklist page
+        if (window.location.href.includes('mobile-checklist')) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const encodedData = urlParams.get('data');
+            if (encodedData) {
+                try {
+                    const jsonData = atob(encodedData);
+                    processedData = JSON.parse(jsonData);
+                    showPreview(processedData);
+                } catch (error) {
+                    console.error("Error decoding shared data:", error);
+                    document.getElementById('output').innerHTML = 'Error decoding shared data: ' + error.message;
+                }
+            }
         }
     </script>
 </body>
