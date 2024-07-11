@@ -9,28 +9,72 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
         h1 {
             text-align: center;
+            color: #333;
         }
         #fileInput, #downloadBtn {
             display: block;
             margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #fileInput:hover, #downloadBtn:hover {
+            background-color: #45a049;
         }
         #output {
             margin-top: 20px;
             text-align: center;
+            font-size: 18px;
+            color: #333;
+        }
+        #preview {
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
         }
     </style>
 </head>
 <body>
-    <h1>CSV Processor</h1>
-    <input type="file" id="fileInput" accept=".csv">
-    <button id="downloadBtn" style="display: none;">Download Processed CSV</button>
-    <div id="output"></div>
+    <div class="container">
+        <h1>CSV Processor</h1>
+        <input type="file" id="fileInput" accept=".csv">
+        <button id="downloadBtn" style="display: none;">Download Processed CSV</button>
+        <div id="output"></div>
+        <div id="preview"></div>
+    </div>
 
     <script>
         let processedCsv = null;
@@ -68,14 +112,14 @@
                     const installNotes = row[installNotesIndex] || '';
                     const parts = row[partsIndex] ? processParts(row[partsIndex]) : '';
                     const jobNumber = row[jobNumberIndex] || '';
-                    return [installNotes, parts, jobNumber];
-                }).filter(row => row.some(cell => cell !== '')); // Remove rows where all cells are empty
+                    return ['', installNotes, parts, jobNumber]; // Add empty string for checkbox column
+                }).filter(row => row.slice(1).some(cell => cell !== '')); // Remove rows where all cells (except checkbox) are empty
 
                 // Sort by Install Notes column
-                processedData.sort((a, b) => a[0].localeCompare(b[0]));
+                processedData.sort((a, b) => a[1].localeCompare(b[1]));
 
                 // Add headers to the processed data
-                processedData.unshift(['Install Notes', 'Parts', 'Job #']);
+                processedData.unshift(['', 'Install Notes', 'Parts', 'Job #']);
 
                 // Generate CSV content
                 processedCsv = Papa.unparse(processedData);
@@ -83,6 +127,9 @@
                 // Show download button
                 document.getElementById('downloadBtn').style.display = 'block';
                 document.getElementById('output').innerHTML = 'CSV processed successfully. Click the download button to save the file.';
+
+                // Show preview
+                showPreview(processedData);
             } catch (error) {
                 console.error('Error processing data:', error);
                 document.getElementById('output').innerHTML = 'Error processing CSV data: ' + error.message;
@@ -108,6 +155,32 @@
             
             // Join the filtered parts back into a string
             return filteredParts.join(', ');
+        }
+
+        function showPreview(data) {
+            const previewElement = document.getElementById('preview');
+            const table = document.createElement('table');
+            const headerRow = table.insertRow();
+            data[0].forEach((header, index) => {
+                const th = document.createElement('th');
+                th.textContent = index === 0 ? 'Check' : header;
+                headerRow.appendChild(th);
+            });
+            data.slice(1).forEach(row => {
+                const tr = table.insertRow();
+                row.forEach((cell, index) => {
+                    const td = tr.insertCell();
+                    if (index === 0) {
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        td.appendChild(checkbox);
+                    } else {
+                        td.textContent = cell;
+                    }
+                });
+            });
+            previewElement.innerHTML = '';
+            previewElement.appendChild(table);
         }
 
         function downloadCsv() {
