@@ -10,51 +10,61 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 0;
+            max-width: 1000px;
+            margin: 0 auto;
             padding: 20px;
-            background-color: #f4f4f4;
+            background-color: #f0f0f0;
         }
         .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 5px;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
         h1 {
+            text-align: center;
             color: #333;
         }
-        input[type="file"] {
-            margin-bottom: 20px;
-        }
-        button {
+        #fileInput, #downloadBtn, #generateQRBtn {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
             background-color: #4CAF50;
             color: white;
-            padding: 10px 15px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            margin-right: 10px;
+            transition: background-color 0.3s;
         }
-        button:hover {
+        #fileInput:hover, #downloadBtn:hover, #generateQRBtn:hover {
             background-color: #45a049;
         }
-        #output, #preview {
+        #output {
             margin-top: 20px;
+            text-align: center;
+            font-size: 18px;
+            color: #333;
+        }
+        #preview {
+            margin-top: 20px;
+            overflow-x: auto;
         }
         table {
-            border-collapse: collapse;
             width: 100%;
+            border-collapse: collapse;
         }
         th, td {
-            text-align: left;
+            border: 1px solid #ddd;
             padding: 8px;
-            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
         }
         tr:nth-child(even) {
-            background-color: #f2f2f2;
+            background-color: #f9f9f9;
         }
         #qrcode {
             text-align: center;
@@ -64,17 +74,6 @@
             display: none;
             margin-top: 20px;
             text-align: center;
-        }
-        @media (max-width: 600px) {
-            body {
-                padding: 10px;
-            }
-            .container {
-                padding: 15px;
-            }
-            table {
-                font-size: 14px;
-            }
         }
     </style>
 </head>
@@ -100,25 +99,46 @@
 
         function handleFileSelect(event) {
             const file = event.target.files[0];
-            if (file) {
-                Papa.parse(file, {
-                    complete: function(results) {
-                        processData(results.data);
-                    }
-                });
-            }
+            Papa.parse(file, {
+                complete: function(results) {
+                    processData(results.data);
+                },
+                error: function(error) {
+                    console.error('Error parsing CSV:', error);
+                    document.getElementById('output').innerHTML = 'Error parsing CSV file. Please check the file and try again.';
+                }
+            });
         }
 
         function processData(data) {
             try {
-                let processedData = [['', ...data[0]]];
-                for (let i = 1; i < data.length; i++) {
-                    processedData.push(['', ...data[i]]);
+                // Find the indices of the required columns
+                const headers = data[0];
+                const installNotesIndex = headers.indexOf('Install Notes');
+                const partsIndex = headers.indexOf('Parts');
+                const jobNumberIndex = headers.indexOf('Job #');
+
+                if (installNotesIndex === -1 || partsIndex === -1 || jobNumberIndex === -1) {
+                    throw new Error('Required columns not found in CSV');
                 }
 
+                // Filter and process the data
+                processedData = data.slice(1).map(row => {
+                    const installNotes = row[installNotesIndex] || '';
+                    const parts = row[partsIndex] ? processParts(row[partsIndex]) : '';
+                    const jobNumber = row[jobNumberIndex] || '';
+                    return ['', installNotes, parts, jobNumber]; // Add empty string for checkbox column
+                }).filter(row => row.slice(1).some(cell => cell !== '')); // Remove rows where all cells (except checkbox) are empty
+
+                // Sort by Install Notes column
+                processedData.sort((a, b) => a[1].localeCompare(b[1]));
+
+                // Add headers to the processed data
+                processedData.unshift(['', 'Install Notes', 'Parts', 'Job #']);
+
+                // Generate CSV content
                 processedCsv = Papa.unparse(processedData);
-                processedData = processedData;
-                
+
                 // Show download and QR code buttons
                 document.getElementById('downloadBtn').style.display = 'block';
                 document.getElementById('generateQRBtn').style.display = 'block';
@@ -132,12 +152,59 @@
             }
         }
 
+        function processParts(partsString) {
+            // Remove HAH combinations in various scenarios
+            const cleanedString = partsString
+                .replace(/\b(HAH\w+)\b/g, '')  // Remove HAH followed by alphanumeric characters
+                .replace(/\s+/g, ' ')          // Remove any double spaces
+                .replace(/,\s*,/g, ',')        // Remove empty entries (comma followed by comma)
+                .replace(/^,|,$/g, '')         // Remove leading/trailing commas
+                .trim();                       // Trim leading/trailing spaces
+            
+            // Split the cleaned string by commas
+            const parts = cleanedString.split(',');
+            
+            // Trim whitespace from each part and filter out empty parts
+            const filteredParts = parts
+                .map(part => part.trim())
+                .filter(part => part !== '');
+            
+            // Join the filtered parts back into a string
+            return filteredParts.join(', ');
+        }
+
+        function showPreview(data) {
+            const previewElement = document.getElementById('preview');
+            const table = document.createElement('table');
+            const headerRow = table.insertRow();
+            data[0].forEach((header, index) => {
+                const th = document.createElement('th');
+                th.textContent = index === 0 ? 'Check' : header;
+                headerRow.appendChild(th);
+            });
+            data.slice(1).forEach(row => {
+                const tr = table.insertRow();
+                row.forEach((cell, index) => {
+                    const td = tr.insertCell();
+                    if (index === 0) {
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        td.appendChild(checkbox);
+                    } else {
+                        td.textContent = cell;
+                    }
+                });
+            });
+            previewElement.innerHTML = '';
+            previewElement.appendChild(table);
+        }
+
         function downloadCsv() {
             if (processedCsv) {
                 const blob = new Blob([processedCsv], { type: 'text/csv;charset=utf-8;' });
-                saveAs(blob, "processed_checklist.csv");
+                saveAs(blob, 'processed_data.csv');
             } else {
-                document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
+                document.getElementById('output').innerHTML = 'No processed CSV data available. Please upload and process a CSV file first.';
             }
         }
 
@@ -170,28 +237,6 @@
             } else {
                 document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
             }
-        }
-
-        function showPreview(data) {
-            const previewElement = document.getElementById('preview');
-            let tableHtml = '<table><tr>';
-            data[0].forEach(header => {
-                tableHtml += `<th>${header === '' ? 'Check' : header}</th>`;
-            });
-            tableHtml += '</tr>';
-            data.slice(1).forEach(row => {
-                tableHtml += '<tr>';
-                row.forEach((cell, index) => {
-                    if (index === 0) {
-                        tableHtml += '<td><input type="checkbox"></td>';
-                    } else {
-                        tableHtml += `<td>${cell}</td>`;
-                    }
-                });
-                tableHtml += '</tr>';
-            });
-            tableHtml += '</table>';
-            previewElement.innerHTML = tableHtml;
         }
     </script>
 </body>
