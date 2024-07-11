@@ -90,8 +90,13 @@
         }
 
         function processParts(partsString) {
-            // Remove HAH combinations with spaces on both sides
-            const cleanedString = partsString.replace(/(\s|^)HAH\w+(\s|$)/g, '$1$2');
+            // Remove HAH combinations in various scenarios
+            const cleanedString = partsString
+                .replace(/\b(HAH\w+)\b/g, '')  // Remove HAH followed by alphanumeric characters
+                .replace(/\s+/g, ' ')          // Remove any double spaces
+                .replace(/,\s*,/g, ',')        // Remove empty entries (comma followed by comma)
+                .replace(/^,|,$/g, '')         // Remove leading/trailing commas
+                .trim();                       // Trim leading/trailing spaces
             
             // Split the cleaned string by commas
             const parts = cleanedString.split(',');
