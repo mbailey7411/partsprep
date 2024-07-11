@@ -39,7 +39,7 @@
         button:hover {
             background-color: #45a049;
         }
-        #output, #shareText {
+        #output {
             margin-top: 20px;
             padding: 10px;
             background-color: #e7f3fe;
@@ -65,10 +65,8 @@
         <h1>CSV Processor and Checklist Generator</h1>
         <input type="file" id="fileInput" accept=".csv">
         <button id="downloadBtn" style="display: none;">Download Processed CSV</button>
-        <button id="generateShareTextBtn" style="display: none;">Generate Share Text</button>
         <button id="generateGoogleSheetBtn" style="display: none;">Generate Google Sheet</button>
         <div id="output"></div>
-        <div id="shareText"></div>
         <div id="preview"></div>
     </div>
 
@@ -80,7 +78,6 @@
 
         document.getElementById('fileInput').addEventListener('change', handleFileSelect);
         document.getElementById('downloadBtn').addEventListener('click', downloadCsv);
-        document.getElementById('generateShareTextBtn').addEventListener('click', generateShareText);
         document.getElementById('generateGoogleSheetBtn').addEventListener('click', generateGoogleSheet);
 
         function handleFileSelect(event) {
@@ -125,11 +122,10 @@
                 // Generate CSV content
                 processedCsv = Papa.unparse(processedData);
 
-                // Show download, share text, and generate Google Sheet buttons
+                // Show download and generate Google Sheet buttons
                 document.getElementById('downloadBtn').style.display = 'block';
-                document.getElementById('generateShareTextBtn').style.display = 'block';
                 document.getElementById('generateGoogleSheetBtn').style.display = 'block';
-                document.getElementById('output').innerHTML = 'CSV processed successfully. Click the download button to save the file, generate share text for mobile access, or create a Google Sheet.';
+                document.getElementById('output').innerHTML = 'CSV processed successfully. Click the download button to save the file or create a Google Sheet.';
 
                 // Show preview
                 showPreview(processedData);
@@ -195,39 +191,9 @@
             }
         }
 
-        function generateShareText() {
-            if (processedData) {
-                try {
-                    // Convert the processed data to a JSON string
-                    const jsonData = JSON.stringify(processedData);
-                    
-                    // Encode the JSON string to base64
-                    const encodedData = btoa(jsonData);
-                    
-                    // Create the share URL with the encoded data
-                    const shareUrl = `https://mbailey7411.github.io/mobile-checklist/?data=${encodeURIComponent(encodedData)}`;
-                    
-                    // Display share link
-                    const shareTextElement = document.getElementById('shareText');
-                    shareTextElement.innerHTML = `
-                        <p>Copy and share this text:</p>
-                        <textarea rows="4" cols="50" readonly>${shareUrl}</textarea>
-                        <p>Instructions: Copy the above text and send it to the recipient. They can paste it into their browser to view the checklist.</p>
-                    `;
-                    
-                    document.getElementById('output').innerHTML = 'Share text generated successfully. Copy and share the text above.';
-                } catch (error) {
-                    console.error("Error generating share text:", error);
-                    document.getElementById('output').innerHTML = 'Error generating share text: ' + error.message;
-                }
-            } else {
-                document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
-            }
-        }
-
         function generateGoogleSheet() {
             if (processedData) {
-                fetch('https://script.google.com/macros/s/AKfycby3qyrU3ATqfVDyXNo0Lqm6QUx51TSOcQK4UlDnr9OTX-fZVHxJflcgfhO4Mxy1kYAmXA/exec', {
+                fetch('https://script.google.com/macros/s/AKfycbzlYiKKB2v6oWbYHhgvZl0qGk4_kZRF8JAtRqGK_NP9nDY7LDN-pdhgT0hMl5DbKaxDxg/exec', {
                     method: 'POST',
                     mode: 'no-cors',
                     headers: {
@@ -235,40 +201,14 @@
                     },
                     body: `action=create&data=${encodeURIComponent(JSON.stringify(processedData))}`
                 })
-                .then(response => response.text())
-                .then(data => {
-                    try {
-                        const jsonData = JSON.parse(data);
-                        if (jsonData.sheetId) {
-                            document.getElementById('output').innerHTML = `Google Sheet created successfully! <a href="https://docs.google.com/spreadsheets/d/${jsonData.sheetId}" target="_blank">Open Sheet</a>`;
-                        } else if (jsonData.error) {
-                            document.getElementById('output').innerHTML = `Error: ${jsonData.error}`;
-                        }
-                    } catch (error) {
-                        document.getElementById('output').innerHTML = 'Error: Unable to parse response from server.';
-                    }
+                .then(response => {
+                    document.getElementById('output').innerHTML = 'Google Sheet created successfully! The sheet will be available shortly.';
                 })
                 .catch(error => {
                     document.getElementById('output').innerHTML = `Error: ${error.message}`;
                 });
             } else {
                 document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
-            }
-        }
-
-        // Check if we're on the mobile checklist page
-        if (window.location.href.includes('mobile-checklist')) {
-            const urlParams = new URLSearchParams(window.location.search);
-            const encodedData = urlParams.get('data');
-            if (encodedData) {
-                try {
-                    const jsonData = atob(encodedData);
-                    processedData = JSON.parse(jsonData);
-                    showPreview(processedData);
-                } catch (error) {
-                    console.error("Error decoding shared data:", error);
-                    document.getElementById('output').innerHTML = 'Error decoding shared data: ' + error.message;
-                }
             }
         }
     </script>
