@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Processor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        #fileInput, #downloadBtn {
+            display: block;
+            margin: 20px auto;
+        }
+        #output {
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>CSV Processor</h1>
+    <input type="file" id="fileInput" accept=".csv">
+    <button id="downloadBtn" style="display: none;">Download Processed CSV</button>
+    <div id="output"></div>
+
+    <script>
+        let processedCsv = null;
+
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        document.getElementById('downloadBtn').addEventListener('click', downloadCsv);
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            Papa.parse(file, {
+                complete: function(results) {
+                    processData(results.data);
+                },
+                error: function(error) {
+                    console.error('Error parsing CSV:', error);
+                    document.getElementById('output').innerHTML = 'Error parsing CSV file. Please check the file and try again.';
+                }
+            });
+        }
+
+        function processData(data) {
+            try {
+                // Find the indices of the required columns
+                const headers = data[0];
+                const installNotesIndex = headers.indexOf('Install Notes');
+                const partsIndex = headers.indexOf('Parts');
+                const jobNumberIndex = headers.indexOf('Job #');
+
+                if (installNotesIndex === -1 || partsIndex === -1 || jobNumberIndex === -1) {
+                    throw new Error('Required columns not found in CSV');
+                }
+
+                // Filter and process the data
+                const processedData = data.slice(1).map(row => {
+                    const installNotes = row[installNotesIndex] || '';
+                    const parts = row[partsIndex] ? row[partsIndex].split(',').filter(part => !part.trim().startsWith('HAH')).join(',') : '';
+                    const jobNumber = row[jobNumberIndex] || '';
+                    return [installNotes, parts, jobNumber];
+                }).filter(row => row.some(cell => cell !== '')); // Remove rows where all cells are empty
+
+                // Sort by Install Notes column
+                processedData.sort((a, b) => a[0].localeCompare(b[0]));
+
+                // Add headers to the processed data
+                processedData.unshift(['Install Notes', 'Parts', 'Job #']);
+
+                // Generate CSV content
+                processedCsv = Papa.unparse(processedData);
+
+                // Show download button
+                document.getElementById('downloadBtn').style.display = 'block';
+                document.getElementById('output').innerHTML = 'CSV processed successfully. Click the download button to save the file.';
+            } catch (error) {
+                console.error('Error processing data:', error);
+                document.getElementById('output').innerHTML = 'Error processing CSV data: ' + error.message;
+            }
+        }
+
+        function downloadCsv() {
+            if (processedCsv) {
+                const blob = new Blob([processedCsv], { type: 'text/csv;charset=utf-8;' });
+                saveAs(blob, 'processed_data.csv');
+            } else {
+                document.getElementById('output').innerHTML = 'No processed CSV data available. Please upload and process a CSV file first.';
+            }
+        }
+    </script>
+</body>
+</html>
