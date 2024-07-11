@@ -1,80 +1,103 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- ... (keep the existing head content) ... -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV to Google Sheet Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        input[type="file"] {
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e7f3fe;
+            border-left: 6px solid #2196F3;
+        }
+    </style>
 </head>
 <body>
-    <!-- ... (keep the existing body content) ... -->
+    <div class="container">
+        <h1>CSV to Google Sheet Converter</h1>
+        <input type="file" id="fileInput" accept=".csv">
+        <button onclick="processFile()">Generate Google Sheet</button>
+        <div id="result"></div>
+    </div>
 
     <script>
-        // ... (keep the existing script content, but replace the generateCode and loadData functions with the following) ...
+        function processFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
 
-        async function generateCode() {
-            if (processedData) {
-                const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-                const response = await fetch('https://api.jsonbin.io/v3/b', {
+            if (!file) {
+                alert('Please select a CSV file first.');
+                return;
+            }
+
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const csvData = e.target.result;
+                const lines = csvData.split('\n');
+                const result = lines.map(line => line.split(','));
+
+                fetch('https://script.google.com/macros/s/AKfycby3qyrU3ATqfVDyXNo0Lqm6QUx51TSOcQK4UlDnr9OTX-fZVHxJflcgfhO4Mxy1kYAmXA/exec', {
                     method: 'POST',
+                    mode: 'no-cors',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': '$2b$10$gu2jIbp5wtEWYM1U0T3WKe4sX8XhpUyHQu6h3Hslnqg1N2M8w7qXq'
+                        'Content-Type': 'application/x-www-form-urlencoded',
                     },
-                    body: JSON.stringify(processedData)
-                });
-                const data = await response.json();
-                localStorage.setItem(code, data.metadata.id);
-                document.getElementById('codeOutput').innerHTML = `Your code: ${code}`;
-                document.getElementById('output').innerHTML = 'Code generated. Use this code on your mobile device to access the checklist.';
-            } else {
-                document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
-            }
-        }
-
-        async function loadData() {
-            const code = document.getElementById('codeInput').value.trim().toUpperCase();
-            const binId = localStorage.getItem(code);
-            if (binId) {
-                const response = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
-                    headers: {
-                        'X-Master-Key': '$2b$10$gu2jIbp5wtEWYM1U0T3WKe4sX8XhpUyHQu6h3Hslnqg1N2M8w7qXq'
+                    body: `action=create&data=${encodeURIComponent(JSON.stringify(result))}`
+                })
+                .then(response => response.text())
+                .then(data => {
+                    try {
+                        const jsonData = JSON.parse(data);
+                        if (jsonData.sheetId) {
+                            document.getElementById('result').innerHTML = `Google Sheet created successfully! <a href="https://docs.google.com/spreadsheets/d/${jsonData.sheetId}" target="_blank">Open Sheet</a>`;
+                        } else if (jsonData.error) {
+                            document.getElementById('result').innerHTML = `Error: ${jsonData.error}`;
+                        }
+                    } catch (error) {
+                        document.getElementById('result').innerHTML = 'Error: Unable to parse response from server.';
                     }
+                })
+                .catch(error => {
+                    document.getElementById('result').innerHTML = `Error: ${error.message}`;
                 });
-                const data = await response.json();
-                processedData = data.record;
-                showPreview(processedData);
-                document.getElementById('saveProgressBtn').style.display = 'block';
-                document.getElementById('output').innerHTML = 'Data loaded successfully. You can now check off items and save your progress.';
-            } else {
-                document.getElementById('output').innerHTML = 'Invalid code. Please try again.';
-            }
-        }
+            };
 
-        async function saveProgress() {
-            if (processedData) {
-                const code = document.getElementById('codeInput').value.trim().toUpperCase();
-                const binId = localStorage.getItem(code);
-                if (binId) {
-                    const response = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Master-Key': '$2b$10$gu2jIbp5wtEWYM1U0T3WKe4sX8XhpUyHQu6h3Hslnqg1N2M8w7qXq'
-                        },
-                        body: JSON.stringify(processedData)
-                    });
-                    if (response.ok) {
-                        document.getElementById('output').innerHTML = 'Progress saved successfully. You can now close this page and continue later using the same code.';
-                    } else {
-                        document.getElementById('output').innerHTML = 'Error saving progress. Please try again.';
-                    }
-                } else {
-                    document.getElementById('output').innerHTML = 'Invalid code. Please load data first.';
-                }
-            } else {
-                document.getElementById('output').innerHTML = 'No data to save. Please load data first.';
-            }
+            reader.readAsText(file);
         }
-
-        // ... (keep the rest of the script content) ...
     </script>
 </body>
 </html>
