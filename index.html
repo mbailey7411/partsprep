@@ -49,7 +49,6 @@
             text-align: center;
         }
     </style>
-    <script src="https://apis.google.com/js/api.js"></script>
 </head>
 <body>
     <div class="container">
@@ -65,15 +64,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
     <script>
-        // Google Sheets API configuration
-        const API_KEY = 'YOUR_API_KEY';
-        const SHEET_ID = '1vYnNgZYoj8msRDNND9SkWCLd4mgFePxksavNFG7knxQ';
-        const RANGE = 'Sheet1!A:C';
-
         let processedData = null;
 
         document.getElementById('processBtn').addEventListener('click', processCSV);
-        document.getElementById('generateBtn').addEventListener('click', generateChecklist);
+        document.getElementById('generateBtn').addEventListener('click', generateGoogleSheet);
 
         // Generate QR code
         new QRCode(document.getElementById("qrcode"), "https://docs.google.com/spreadsheets/d/1vYnNgZYoj8msRDNND9SkWCLd4mgFePxksavNFG7knxQ/edit?usp=sharing");
@@ -128,39 +122,28 @@
                 .join(', ');
         }
 
-        function generateChecklist() {
-            if (!processedData) {
-                document.getElementById('output').innerHTML = 'Please process a CSV file first.';
-                return;
+        function generateGoogleSheet() {
+            if (processedData) {
+                document.getElementById('output').innerHTML = 'Updating Google Sheet...';
+                
+                fetch('https://script.google.com/macros/s/AKfycbyh3QpnMdEEhx6PdL2bVoAqm_45KG-hBcTQdqDjgMuI-46-XOgmDW7hcmbAf-MFKF-4/exec', {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(processedData)
+                })
+                .then(response => {
+                    document.getElementById('output').innerHTML = 'Google Sheet updated successfully!';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('output').innerHTML = 'Error updating Google Sheet. Please try again.';
+                });
+            } else {
+                document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
             }
-
-            gapi.load('client', initClient);
-        }
-
-        function initClient() {
-            gapi.client.init({
-                apiKey: API_KEY,
-                discoveryDocs: ["https://sheets.googleapis.com/$discovery/rest?version=v4"],
-            }).then(function () {
-                updateSheet();
-            }, function(error) {
-                document.getElementById('output').innerHTML = 'Error initializing Google Sheets API: ' + error.details;
-            });
-        }
-
-        function updateSheet() {
-            gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: SHEET_ID,
-                range: RANGE,
-                valueInputOption: 'RAW',
-                resource: {
-                    values: [['Install Notes', 'Parts', 'Job #'], ...processedData]
-                }
-            }).then(function(response) {
-                document.getElementById('output').innerHTML = 'Checklist generated and updated in Google Sheets.';
-            }, function(response) {
-                document.getElementById('output').innerHTML = 'Error updating sheet: ' + response.result.error.message;
-            });
         }
     </script>
 </body>
