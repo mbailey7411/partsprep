@@ -193,20 +193,43 @@
 
         function generateGoogleSheet() {
             if (processedData) {
-                fetch('https://script.google.com/macros/s/AKfycbzlYiKKB2v6oWbYHhgvZl0qGk4_kZRF8JAtRqGK_NP9nDY7LDN-pdhgT0hMl5DbKaxDxg/exec', {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `action=create&data=${encodeURIComponent(JSON.stringify(processedData))}`
-                })
-                .then(response => {
-                    document.getElementById('output').innerHTML = 'Google Sheet created successfully! The sheet will be available shortly.';
-                })
-                .catch(error => {
-                    document.getElementById('output').innerHTML = `Error: ${error.message}`;
-                });
+                document.getElementById('output').innerHTML = 'Creating Google Sheet... Please wait.';
+                
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'https://script.google.com/macros/s/AKfycbzlYiKKB2v6oWbYHhgvZl0qGk4_kZRF8JAtRqGK_NP9nDY7LDN-pdhgT0hMl5DbKaxDxg/exec';
+                form.target = 'hidden_iframe';
+
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'data';
+                input.value = JSON.stringify(processedData);
+
+                form.appendChild(input);
+                document.body.appendChild(form);
+
+                const iframe = document.createElement('iframe');
+                iframe.name = 'hidden_iframe';
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
+
+                iframe.onload = function() {
+                    const sheetUrl = iframe.contentWindow.location.href;
+                    const sheetId = new URLSearchParams(new URL(sheetUrl).search).get('sheetId');
+                    
+                    if (sheetId) {
+                        const sheetLink = `https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=0`;
+                        document.getElementById('output').innerHTML = `Google Sheet created successfully! <a href="${sheetLink}" target="_blank">Open Sheet</a>`;
+                    } else {
+                        document.getElementById('output').innerHTML = 'Error: Unable to retrieve Google Sheet ID.';
+                    }
+                    
+                    // Clean up
+                    document.body.removeChild(form);
+                    document.body.removeChild(iframe);
+                };
+
+                form.submit();
             } else {
                 document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
             }
