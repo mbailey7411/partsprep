@@ -90,8 +90,8 @@
         }
 
         function processParts(partsString) {
-            // Remove all occurrences of "HAH" followed by any characters up to the next comma or end of string
-            const cleanedString = partsString.replace(/HAH[^,]*,?/g, '');
+            // Remove HAH combinations with spaces on both sides
+            const cleanedString = partsString.replace(/\s+HAH\w+\s+/g, ' ');
             
             // Split the cleaned string by commas
             const parts = cleanedString.split(',');
