@@ -3,67 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSV Processor and Mobile Check</title>
+    <title>CSV to Table with QR Code</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f0f0f0;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 20px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-        }
-        input[type="file"] {
-            margin-bottom: 10px;
-        }
-        button {
-            padding: 10px 20px;
-            margin-right: 10px;
-            font-size: 16px;
-            cursor: pointer;
-        }
         table {
-            width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            width: 100%;
         }
         th, td {
-            border: 1px solid #ddd;
+            border: 1px solid black;
             padding: 8px;
             text-align: left;
         }
         th {
             background-color: #f2f2f2;
         }
-        #qrcode {
-            margin-top: 20px;
-        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>CSV Processor and Mobile Check</h1>
-        <div id="csvProcessor">
-            <input type="file" id="csvFile" accept=".csv">
-            <button onclick="processCSV()">Process CSV</button>
-            <button onclick="downloadPDF()">Download PDF</button>
-            <div id="output"></div>
-            <div id="qrcode"></div>
-        </div>
-    </div>
+    <input type="file" id="csvFile" accept=".csv">
+    <button onclick="processCSV()">Process CSV</button>
+    <div id="output"></div>
+    <div id="qrcode"></div>
 
     <script>
         let processedData = [];
@@ -71,31 +34,33 @@
         function processCSV() {
             const fileInput = document.getElementById('csvFile');
             const file = fileInput.files[0];
-
-            if (file) {
-                Papa.parse(file, {
-                    complete: function(results) {
-                        processedData = results.data.map(row => [...row, '']);
-                        displayTable(processedData);
-                        generateQRCode();
-                    }
-                });
-            } else {
-                alert('Please select a CSV file first.');
-            }
+            
+            Papa.parse(file, {
+                complete: function(results) {
+                    processedData = results.data;
+                    displayTable(processedData);
+                    generateQRCode();
+                }
+            });
         }
 
         function displayTable(data) {
-            let tableHtml = '<table><tr><th>Sequence</th><th>Loc</th><th>Parts</th><th>Job #</th><th>Last Name</th><th>Other Notes</th><th>Needs Attn</th></tr>';
+            let tableHtml = '<table><tr>';
             
-            data.forEach((row, index) => {
+            // Create table header
+            for (let i = 0; i < data[0].length; i++) {
+                tableHtml += `<th>${data[0][i]}</th>`;
+            }
+            tableHtml += '</tr>';
+            
+            // Create table rows
+            for (let i = 1; i < data.length; i++) {
                 tableHtml += '<tr>';
-                tableHtml += `<td>${index + 1}</td>`;
-                row.forEach(cell => {
-                    tableHtml += `<td>${cell}</td>`;
-                });
+                for (let j = 0; j < data[i].length; j++) {
+                    tableHtml += `<td>${data[i][j]}</td>`;
+                }
                 tableHtml += '</tr>';
-            });
+            }
             
             tableHtml += '</table>';
             document.getElementById('output').innerHTML = tableHtml;
@@ -103,40 +68,9 @@
 
         function generateQRCode() {
             const compressedData = LZString.compressToEncodedURIComponent(JSON.stringify(processedData));
-            const qrCodeUrl = `https://mbailey7411.github.io/Glass-Check/?data=${compressedData}`;
+            const qrCodeUrl = `https://mbailey7411.github.io/mobile-checklist.html?data=${compressedData}`;
             new QRCode(document.getElementById("qrcode"), qrCodeUrl);
             document.getElementById('output').innerHTML += '<p>Scan QR code to run check on mobile device</p>';
-        }
-
-        function downloadPDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            
-            doc.text("Processed CSV Data", 10, 10);
-            
-            let yPos = 20;
-            processedData.forEach((row, index) => {
-                doc.text(`${index + 1}. ${row.join(", ")}`, 10, yPos);
-                yPos += 10;
-                
-                if (yPos > 280) {
-                    doc.addPage();
-                    yPos = 20;
-                }
-            });
-            
-            doc.save("processed_data.pdf");
-        }
-
-        // Handle incoming data from mobile-checklist.html
-        window.onload = function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const compressedData = urlParams.get('data');
-            if (compressedData) {
-                processedData = JSON.parse(LZString.decompressFromEncodedURIComponent(compressedData));
-                displayTable(processedData);
-                alert('Data updated from mobile check!');
-            }
         }
     </script>
 </body>
