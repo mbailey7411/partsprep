@@ -77,43 +77,20 @@
         .btn:hover {
             opacity: 0.8;
         }
-        #qrcode, #emailLink {
+        #linkContainer {
             text-align: center;
             margin-top: 20px;
         }
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1;
-            padding-top: 100px;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgb(0,0,0);
-            background-color: rgba(0,0,0,0.4);
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: auto;
+        #csvFile {
+            border: 2px dashed #ddd;
+            border-radius: 5px;
             padding: 20px;
-            border: 1px solid #888;
-            width: 80%;
-            max-width: 600px;
-            border-radius: 10px;
-        }
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-        }
-        .close:hover,
-        .close:focus {
-            color: black;
-            text-decoration: none;
+            text-align: center;
             cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        #csvFile:hover {
+            border-color: #3498db;
         }
     </style>
 </head>
@@ -121,34 +98,25 @@
     <div class="container">
         <h1>CSV Processor and Mobile Check</h1>
         <div id="csvProcessor" class="card">
-            <input type="file" id="csvFile" accept=".csv">
-            <button class="btn btn-primary" onclick="processCSV()">Process CSV</button>
-            <button class="btn btn-info" onclick="downloadPDF()">Download PDF</button>
-            <button class="btn btn-success" onclick="startGlassCheck()">Glass Check</button>
+            <input type="file" id="csvFile" accept=".csv" onchange="handleFileSelect(event)">
             <div id="output"></div>
-            <div id="emailLink"></div>
-        </div>
-    </div>
-
-    <!-- The Modal -->
-    <div id="qrModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
-            <h2>Scan the QR code to perform Glass Check</h2>
-            <div id="qrcode"></div>
+            <button class="btn btn-info" onclick="downloadPDF()">Download PDF</button>
+            <button class="btn btn-success" onclick="copyLink()">Copy Link</button>
+            <div id="linkContainer"></div>
         </div>
     </div>
 
     <script>
         let processedData = [];
 
-        function processCSV() {
-            const file = document.getElementById('csvFile').files[0];
-            if (!file) {
-                alert("Please select a CSV file.");
-                return;
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                processCSV(file);
             }
+        }
 
+        function processCSV(file) {
             Papa.parse(file, {
                 complete: function(results) {
                     const data = results.data;
@@ -209,7 +177,7 @@
             document.getElementById('output').innerHTML = tableHtml;
         }
 
-        function startGlassCheck() {
+        function copyLink() {
             if (processedData.length === 0) {
                 alert("Please load and process a CSV file first.");
                 return;
@@ -224,28 +192,32 @@
 
                 const mobileCheckUrl = `https://mbailey7411.github.io/Glass-Check/mobile-check.html?data=${compressedData}`;
                 console.log("Mobile Check URL:", mobileCheckUrl);
-                
-                // Clear previous content
-                document.getElementById("qrcode").innerHTML = '';
-                document.getElementById("emailLink").innerHTML = '';
 
-                // Generate an email link
-                const emailSubject = "Glass Check Data Link";
-                const emailBody = `Please use the following link to access the glass check data:\n\n${mobileCheckUrl}`;
-                const mailtoLink = `mailto:?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-                const emailHTML = `<p>Alternatively, you can <a href="${mailtoLink}" target="_blank">email this link</a> to yourself or others.</p>`;
-                document.getElementById("emailLink").innerHTML = emailHTML;
-
-                // Display the modal
-                document.getElementById('qrModal').style.display = 'block';
+                // Display the link and provide a button to copy it
+                const linkContainer = document.getElementById("linkContainer");
+                linkContainer.innerHTML = `
+                    <p>Copy the link below and paste it into your mobile device:</p>
+                    <input type="text" value="${mobileCheckUrl}" id="mobileCheckLink" readonly style="width: 100%; padding: 10px; box-sizing: border-box;">
+                    <button class="btn btn-info" onclick="copyToClipboard()">Copy to Clipboard</button>
+                `;
             } catch (error) {
                 console.error("Error generating link:", error);
                 alert("An error occurred while generating the link. Please try again.");
             }
         }
 
-        function closeModal() {
-            document.getElementById('qrModal').style.display = 'none';
+        function copyToClipboard() {
+            const linkInput = document.getElementById("mobileCheckLink");
+            linkInput.select();
+            linkInput.setSelectionRange(0, 99999); // For mobile devices
+
+            try {
+                document.execCommand("copy");
+                alert("Link copied to clipboard!");
+            } catch (error) {
+                console.error("Error copying to clipboard:", error);
+                alert("Failed to copy the link. Please try manually selecting and copying the link.");
+            }
         }
 
         function downloadPDF() {
