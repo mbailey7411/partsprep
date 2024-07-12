@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CSV Processor</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -26,22 +26,6 @@
         h1 {
             color: #333;
         }
-        input[type="file"] {
-            margin-bottom: 20px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
         #qrcode {
             margin-top: 20px;
         }
@@ -57,58 +41,44 @@
     </div>
 
     <script>
-        let processedData = [];
-
         function processCSV() {
-            const file = document.getElementById('csvFile').files[0];
-            Papa.parse(file, {
-                complete: function(results) {
-                    const data = results.data;
-                    const headers = data[0];
-                    const installNotesIndex = headers.indexOf('Install Notes');
-                    const partsIndex = headers.indexOf('Parts');
-                    const jobIndex = headers.indexOf('Job #');
-                    const lastNameIndex = headers.indexOf('Last Name');
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            
+            if (file) {
+                Papa.parse(file, {
+                    complete: function(results) {
+                        const processedData = results.data.map(row => {
+                            const bracketsContent = row[0].match(/\[(.*?)\]/);
+                            return [
+                                row[0],
+                                bracketsContent ? bracketsContent[1] : '',
+                                row[1],
+                                row[2],
+                                row[3],
+                                row[0].replace(/\[.*?\]/, '').trim()
+                            ];
+                        });
 
-                    processedData = data.slice(1).map(row => {
-                        const installNotes = row[installNotesIndex] || '';
-                        const bracketsContent = installNotes.match(/\[.*?\]/g) || [];
-                        const nonBracketsContent = installNotes.replace(/\[.*?\]/g, '').trim();
+                        const jsonData = JSON.stringify(processedData);
+                        const compressedData = LZString.compressToEncodedURIComponent(jsonData);
+                        const mobileCheckURL = `mobile-check.html?data=${compressedData}`;
 
-                        return [
-                            '', // Empty first column
-                            bracketsContent.join(' '),
-                            row[partsIndex] || '',
-                            row[jobIndex] || '',
-                            row[lastNameIndex] || '',
-                            nonBracketsContent
-                        ];
-                    });
+                        // Generate QR code
+                        const qr = qrcode(0, 'L');
+                        qr.addData(mobileCheckURL);
+                        qr.make();
+                        document.getElementById('qrcode').innerHTML = qr.createImgTag(5);
 
-                    displayTable(processedData);
-                    generateQRCode();
-                }
-            });
-        }
-
-        function displayTable(data) {
-            let tableHtml = '<table><tr><th>Column 1</th><th>Brackets Content</th><th>Parts</th><th>Job #</th><th>Last Name</th><th>Non-Brackets Content</th></tr>';
-            data.forEach(row => {
-                tableHtml += '<tr>';
-                row.forEach(cell => {
-                    tableHtml += `<td>${cell}</td>`;
+                        document.getElementById('output').innerHTML = `
+                            <p>CSV processed successfully!</p>
+                            <p>Scan the QR code below to open the mobile check page:</p>
+                        `;
+                    }
                 });
-                tableHtml += '</tr>';
-            });
-            tableHtml += '</table>';
-            document.getElementById('output').innerHTML = tableHtml;
-        }
-
-        function generateQRCode() {
-            const compressedData = LZString.compressToEncodedURIComponent(JSON.stringify(processedData));
-            const qrCodeUrl = `https://mbailey7411.github.io/Glass-Check/mobile-check.html?data=${compressedData}`;
-            new QRCode(document.getElementById("qrcode"), qrCodeUrl);
-            document.getElementById('output').innerHTML += '<p>Scan QR code to run check on mobile device</p>';
+            } else {
+                alert('Please select a CSV file first.');
+            }
         }
     </script>
 </body>
