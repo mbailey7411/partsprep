@@ -82,6 +82,41 @@
             text-align: center;
             margin-top: 20px;
         }
+        /* Modal styles */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1; 
+            padding-top: 100px; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgb(0,0,0); 
+            background-color: rgba(0,0,0,0.4); 
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 10px;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -93,6 +128,14 @@
             <button class="btn btn-info" onclick="downloadPDF()">Download PDF</button>
             <button class="btn btn-success" onclick="startGlassCheck()">Glass Check</button>
             <div id="output"></div>
+        </div>
+    </div>
+
+    <!-- The Modal -->
+    <div id="qrModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>Scan the QR code to perform Glass Check</h2>
             <div id="qrcode"></div>
         </div>
     </div>
@@ -159,17 +202,18 @@
             }
             
             const compressedData = LZString.compressToEncodedURIComponent(JSON.stringify(processedData));
-            const mobileCheckUrl = `mobile-check.html?data=${compressedData}`;
+            const mobileCheckUrl = `https://mbailey7411.github.io/Glass-Check/mobile-check.html?data=${compressedData}`;
             
             const qrCodeElement = document.getElementById("qrcode");
             qrCodeElement.innerHTML = ''; // Clear previous QR code
             new QRCode(qrCodeElement, mobileCheckUrl);
             
-            // Check if instructions are already present
-            if (!document.querySelector('#output h2')) {
-                document.getElementById('output').innerHTML += '<h2>Mobile Glass Check</h2><p>Scan the QR code below to perform the glass check on your mobile device:</p>';
-            }
-            qrCodeElement.style.display = 'block';
+            // Display the modal
+            document.getElementById('qrModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('qrModal').style.display = 'none';
         }
 
         function downloadPDF() {
