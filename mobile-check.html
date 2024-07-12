@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Check</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #333;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .found-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+        }
+        .issue-btn {
+            background-color: #f44336;
+            color: white;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="content">
+        <h1>Mobile Check</h1>
+        <p>Loading data...</p>
+    </div>
+
+    <script>
+        const API_KEY = '$2a$10$jMYzHkYqx6L.VT3oTL2tWuTUnCGXZpQFcx6rhvaNQSWi68t4fBZwm';
+        let processedData = [];
+        let currentIndex = 0;
+        let itemsWithIssues = [];
+
+        function loadData() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const binId = urlParams.get('binId');
+
+            fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
+                headers: {
+                    'X-Master-Key': API_KEY
+                }
+            })
+            .then(response => response.json())
+            .then(result => {
+                processedData = result.record;
+                startMobileCheck();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('content').innerHTML = '<p style="color: red;">Error loading data. Please try again.</p>';
+            });
+        }
+
+        function startMobileCheck() {
+            showItem();
+        }
+
+        function showItem() {
+            const content = document.getElementById('content');
+            if (currentIndex < processedData.length) {
+                const item = processedData[currentIndex];
+                content.innerHTML = `
+                    <h2>Item ${currentIndex + 1} of ${processedData.length}</h2>
+                    <p><strong>Brackets Content:</strong> ${item[1]}</p>
+                    <p><strong>Parts:</strong> ${item[2]}</p>
+                    <p><strong>Job #:</strong> ${item[3]}</p>
+                    <p><strong>Last Name:</strong> ${item[4]}</p>
+                    <p><strong>Non-Brackets Content:</strong> ${item[5]}</p>
+                    <button onclick="itemFound()" class="found-btn">Found</button>
+                    <button onclick="itemIssue()" class="issue-btn">Issue</button>
+                `;
+            } else {
+                content.innerHTML = `
+                    <h2>Check Complete!</h2>
+                    <p>All items have been checked.</p>
+                    <p>Number of items with issues: ${itemsWithIssues.length}</p>
+                    <button onclick="sendEmail()">Send Email Report</button>
+                `;
+            }
+        }
+
+        function itemFound() {
+            currentIndex++;
+            showItem();
+        }
+
+        function itemIssue() {
+            itemsWithIssues.push(processedData[currentIndex]);
+            currentIndex++;
+            showItem();
+        }
+
+        function sendEmail() {
+            // In a real application, you would send this data to a server to handle email sending
+            // For this example, we'll just log the issues to the console
+            console.log("Items with issues:", itemsWithIssues);
+            alert("Email report sent! (simulated)");
+        }
+
+        // Start the process
+        loadData();
+    </script>
+</body>
+</html>
