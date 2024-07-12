@@ -7,7 +7,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.20/jspdf.plugin.autotable.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -62,24 +61,12 @@
             font-size: 16px;
             transition: background-color 0.3s;
         }
-        .btn-primary {
-            background-color: #3498db;
-            color: white;
-        }
-        .btn-success {
-            background-color: #2ecc71;
-            color: white;
-        }
         .btn-info {
             background-color: #34495e;
             color: white;
         }
         .btn:hover {
             opacity: 0.8;
-        }
-        #linkContainer {
-            text-align: center;
-            margin-top: 20px;
         }
         #csvFile {
             border: 2px dashed #ddd;
@@ -88,9 +75,15 @@
             text-align: center;
             cursor: pointer;
             transition: border-color 0.3s;
+            max-width: 300px;
+            margin: 0 auto 20px;
+            display: block;
         }
         #csvFile:hover {
             border-color: #3498db;
+        }
+        .center-content {
+            text-align: center;
         }
     </style>
 </head>
@@ -98,11 +91,11 @@
     <div class="container">
         <h1>CSV Processor and Mobile Check</h1>
         <div id="csvProcessor" class="card">
-            <input type="file" id="csvFile" accept=".csv" onchange="handleFileSelect(event)">
+            <div class="center-content">
+                <input type="file" id="csvFile" accept=".csv" onchange="handleFileSelect(event)">
+                <button class="btn btn-info" onclick="downloadPDF()">Download PDF</button>
+            </div>
             <div id="output"></div>
-            <button class="btn btn-info" onclick="downloadPDF()">Download PDF</button>
-            <button class="btn btn-success" onclick="copyLink()">Copy Link</button>
-            <div id="linkContainer"></div>
         </div>
     </div>
 
@@ -175,49 +168,6 @@
             });
             tableHtml += '</table>';
             document.getElementById('output').innerHTML = tableHtml;
-        }
-
-        function copyLink() {
-            if (processedData.length === 0) {
-                alert("Please load and process a CSV file first.");
-                return;
-            }
-
-            try {
-                const jsonData = JSON.stringify(processedData);
-                console.log("JSON Data:", jsonData);
-
-                const compressedData = LZString.compressToEncodedURIComponent(jsonData);
-                console.log("Compressed Data:", compressedData);
-
-                const mobileCheckUrl = `https://mbailey7411.github.io/Glass-Check/mobile-check.html?data=${compressedData}`;
-                console.log("Mobile Check URL:", mobileCheckUrl);
-
-                // Display the link and provide a button to copy it
-                const linkContainer = document.getElementById("linkContainer");
-                linkContainer.innerHTML = `
-                    <p>Copy the link below and paste it into your mobile device:</p>
-                    <input type="text" value="${mobileCheckUrl}" id="mobileCheckLink" readonly style="width: 100%; padding: 10px; box-sizing: border-box;">
-                    <button class="btn btn-info" onclick="copyToClipboard()">Copy to Clipboard</button>
-                `;
-            } catch (error) {
-                console.error("Error generating link:", error);
-                alert("An error occurred while generating the link. Please try again.");
-            }
-        }
-
-        function copyToClipboard() {
-            const linkInput = document.getElementById("mobileCheckLink");
-            linkInput.select();
-            linkInput.setSelectionRange(0, 99999); // For mobile devices
-
-            try {
-                document.execCommand("copy");
-                alert("Link copied to clipboard!");
-            } catch (error) {
-                console.error("Error copying to clipboard:", error);
-                alert("Failed to copy the link. Please try manually selecting and copying the link.");
-            }
         }
 
         function downloadPDF() {
