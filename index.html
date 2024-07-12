@@ -5,10 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CSV Processor and Mobile Check</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.20/jspdf.plugin.autotable.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -31,7 +30,7 @@
         .card {
             background-color: white;
             border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             padding: 20px;
             margin-bottom: 20px;
         }
@@ -51,7 +50,7 @@
         }
         table th:first-child,
         table td:first-child {
-            width: 15%;  /* Increased width for Loc column */
+            width: 15%;
         }
         .btn {
             display: inline-block;
@@ -82,41 +81,6 @@
             text-align: center;
             margin-top: 20px;
         }
-        /* Modal styles */
-        .modal {
-            display: none; 
-            position: fixed; 
-            z-index: 1; 
-            padding-top: 100px; 
-            left: 0;
-            top: 0;
-            width: 100%; 
-            height: 100%; 
-            overflow: auto; 
-            background-color: rgb(0,0,0); 
-            background-color: rgba(0,0,0,0.4); 
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 80%;
-            max-width: 600px;
-            border-radius: 10px;
-        }
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-        }
-        .close:hover,
-        .close:focus {
-            color: black;
-            text-decoration: none;
-            cursor: pointer;
-        }
     </style>
 </head>
 <body>
@@ -128,15 +92,6 @@
             <button class="btn btn-info" onclick="downloadPDF()">Download PDF</button>
             <button class="btn btn-success" onclick="startGlassCheck()">Glass Check</button>
             <div id="output"></div>
-        </div>
-    </div>
-
-    <!-- The Modal -->
-    <div id="qrModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
-            <h2>Scan the QR code to perform Glass Check</h2>
-            <div id="qrcode"></div>
         </div>
     </div>
 
@@ -158,93 +113,92 @@
                         .map(row => {
                             const installNotes = row[installNotesIndex] || '';
                             const bracketsContent = (installNotes.match(/\[(.*?)\]/g) || []).map(item => item.slice(1, -1));
-                            const nonBracketsContent = installNotes.replace(/\[.*?\]/g, '').trim();
-                            
-                            const parts = (row[partsIndex] || '').replace(/\s?HAH\d{6}(?=[,\s]|$)/g, '').trim();
+                            const nonBracketsContent = installNotes.replace(/\[(.*?)\]/g, '').trim();
+                            return {
+                                loc: row[jobIndex] || '',
+                                lastName: row[lastNameIndex] || '',
+                                installNotes: installNotes,
+                                bracketsContent: bracketsContent,
+                                nonBracketsContent: nonBracketsContent,
+                                parts: row[partsIndex] || ''
+                            };
+                        });
 
-                            return [
-                                '', // Empty first column (for PDF)
-                                bracketsContent.join(' '),
-                                parts,
-                                row[jobIndex] || '',
-                                row[lastNameIndex] || '',
-                                nonBracketsContent,
-                                '' // Issues column
-                            ];
-                        })
-                        .filter(row => row.some(cell => cell.trim() !== '')); // Remove blank rows
-
-                    // Sort the processed data alphabetically by the Loc column (index 1)
-                    processedData.sort((a, b) => a[1].localeCompare(b[1]));
-
-                    displayTable(processedData);
+                    displayData();
                 }
             });
         }
 
-        function displayTable(data) {
-            let tableHtml = '<table><tr><th>Loc</th><th>Parts</th><th>Job #</th><th>Last Name</th><th>Other Notes</th><th>Issues</th></tr>';
-            data.forEach(row => {
-                tableHtml += '<tr>';
-                row.slice(1).forEach((cell, index) => {
-                    tableHtml += `<td>${cell}</td>`;
-                });
-                tableHtml += '</tr>';
+        function displayData() {
+            const output = document.getElementById('output');
+            output.innerHTML = '';
+
+            const table = document.createElement('table');
+
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            ['Loc', 'Last Name', 'Install Notes', 'Brackets Content', 'Non-Brackets Content', 'Parts'].forEach(headerText => {
+                const th = document.createElement('th');
+                th.textContent = headerText;
+                headerRow.appendChild(th);
             });
-            tableHtml += '</table>';
-            document.getElementById('output').innerHTML = tableHtml;
-        }
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
 
-        function startGlassCheck() {
-            if (processedData.length === 0) {
-                alert("Please load and process a CSV file first.");
-                return;
-            }
-            
-            const compressedData = LZString.compressToEncodedURIComponent(JSON.stringify(processedData));
-            const mobileCheckUrl = `https://mbailey7411.github.io/Glass-Check/mobile-check.html?data=${compressedData}`;
-            
-            const qrCodeElement = document.getElementById("qrcode");
-            qrCodeElement.innerHTML = ''; // Clear previous QR code
-            new QRCode(qrCodeElement, mobileCheckUrl);
-            
-            // Display the modal
-            document.getElementById('qrModal').style.display = 'block';
-        }
+            const tbody = document.createElement('tbody');
+            processedData.forEach(row => {
+                const tr = document.createElement('tr');
+                Object.values(row).forEach(cellText => {
+                    const td = document.createElement('td');
+                    td.textContent = Array.isArray(cellText) ? cellText.join(', ') : cellText;
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
 
-        function closeModal() {
-            document.getElementById('qrModal').style.display = 'none';
+            output.appendChild(table);
         }
 
         function downloadPDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            
-            const headers = ['Loc', 'Parts', 'Job #', 'Last Name', 'Other Notes', 'Issues'];
-            const data = processedData.map(row => row.slice(1)); // Remove the first empty column
+            const tableData = processedData.map(row => ([
+                row.loc, row.lastName, row.installNotes, row.bracketsContent.join(', '), row.nonBracketsContent, row.parts
+            ]));
 
-            doc.setFontSize(12);
-            doc.text('Work Order Checklist', 14, 15);
-            doc.setFontSize(10);
-
-            // Add the table
             doc.autoTable({
-                head: [headers],
-                body: data,
-                startY: 20,
-                theme: 'grid',
-                styles: { fontSize: 8 },
-                columnStyles: {
-                    0: { cellWidth: 20 },  // Reduced width for Loc column
-                    1: { cellWidth: 40 },
-                    2: { cellWidth: 20 },
-                    3: { cellWidth: 25 },
-                    4: { cellWidth: 60 },  // Increased width for Other Notes
-                    5: { cellWidth: 25 }
-                }
+                head: [['Loc', 'Last Name', 'Install Notes', 'Brackets Content', 'Non-Brackets Content', 'Parts']],
+                body: tableData,
             });
 
-            doc.save("work_order_checklist.pdf");
+            doc.save('output.pdf');
+        }
+
+        async function startGlassCheck() {
+            const apiKey = '$2a$10$DkfRkmihsgtwuX3nscnzK.Og8BXblwjNapx5Ag2D20vopZ/VCW9Ju';
+            const data = JSON.stringify(processedData);
+
+            const response = await fetch('https://api.jsonbin.io/v3/b', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': apiKey,
+                },
+                body: data,
+            });
+
+            const result = await response.json();
+            const binId = result.metadata.id;
+            const url = 'https://mbailey7411.github.io/Glass-Check/mobile-check.html?id=' + binId;
+
+            generateQRCode(url);
+        }
+
+        function generateQRCode(url) {
+            const qrcodeDiv = document.getElementById('qrcode');
+            qrcodeDiv.innerHTML = '';
+            new QRCode(qrcodeDiv, url);
         }
     </script>
 </body>
