@@ -3,157 +3,174 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mobile Checklist</title>
+    <title>Mobile Glass Check</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            line-height: 1.6;
             margin: 0;
             padding: 20px;
-            background-color: #f4f4f4;
+            background-color: #f0f0f0;
         }
         .container {
             max-width: 600px;
-            margin: auto;
-            background: white;
+            margin: 0 auto;
+            background-color: white;
             padding: 20px;
             border-radius: 5px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
-        h1, h2 {
+        h1 {
             color: #333;
         }
-        button {
+        .quiz-item {
+            margin-bottom: 20px;
+        }
+        .quiz-item label {
+            font-weight: bold;
+        }
+        .quiz-buttons {
+            margin-top: 20px;
+        }
+        .quiz-buttons button {
             padding: 10px 20px;
-            margin: 5px;
+            margin-right: 10px;
             font-size: 16px;
             cursor: pointer;
         }
-        .found-btn {
+        #checkButton {
             background-color: #4CAF50;
             color: white;
             border: none;
         }
-        .issue-btn {
+        #stopButton {
             background-color: #f44336;
             color: white;
             border: none;
         }
-        .nav-btn {
+        #emailButton {
             background-color: #008CBA;
             color: white;
             border: none;
         }
+        #issueNotes {
+            display: none;
+            margin-top: 20px;
+        }
+        #issueNotes textarea {
+            width: 100%;
+            height: 100px;
+            margin-bottom: 10px;
+        }
+        #progress {
+            margin-top: 20px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
-    <div class="container" id="content">
-        <h1>Mobile Checklist</h1>
-        <div id="mobileView"></div>
+    <div class="container">
+        <h1>Mobile Glass Check</h1>
+        <div id="glassCheck">
+            <div id="quizItem"></div>
+            <div id="progress"></div>
+            <div class="quiz-buttons">
+                <button id="checkButton" onclick="nextItem('check')">✓</button>
+                <button id="stopButton" onclick="showIssueNotes()">⚠</button>
+                <button id="emailButton" onclick="emailResults()">Email Results</button>
+            </div>
+            <div id="issueNotes">
+                <textarea id="issueNotesText" placeholder="Enter issue notes here..."></textarea>
+                <button onclick="submitIssueNotes()">Submit</button>
+                <button onclick="skipIssueNotes()">Skip</button>
+            </div>
+        </div>
     </div>
 
     <script>
         let processedData = [];
-        let currentIndex = 0;
-        let itemsWithIssues = [];
-        let checkedItems = [];
+        let currentItemIndex = 0;
 
-        // Parse URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const compressedData = urlParams.get('data');
-
-        if (compressedData) {
-            const decompressedData = LZString.decompressFromEncodedURIComponent(compressedData);
-            processedData = JSON.parse(decompressedData);
-            startMobileCheck();
-        } else {
-            document.getElementById('mobileView').innerHTML = '<p>No data provided. Please scan a valid QR code.</p>';
-        }
-
-        function startMobileCheck() {
-            showItem();
-        }
-
-        function showItem() {
-            const mobileView = document.getElementById('mobileView');
-            if (currentIndex < processedData.length) {
-                const item = processedData[currentIndex];
-                mobileView.innerHTML = `
-                    <h2>Item ${currentIndex + 1} of ${processedData.length}</h2>
-                    <p><strong>Brackets Content:</strong> ${item[1]}</p>
-                    <p><strong>Parts:</strong> ${item[2]}</p>
-                    <p><strong>Job #:</strong> ${item[3]}</p>
-                    <p><strong>Last Name:</strong> ${item[4]}</p>
-                    <p><strong>Non-Brackets Content:</strong> ${item[5]}</p>
-                    <button onclick="itemFound()" class="found-btn">✓</button>
-                    <button onclick="itemIssue()" class="issue-btn">⛔</button>
-                    <br><br>
-                    <button onclick="navPrev()" class="nav-btn">◀ Previous</button>
-                    <button onclick="navNext()" class="nav-btn">Next ▶</button>
-                    <br><br>
-                    <button onclick="exportResults()">Export Results</button>
-                `;
+        function loadData() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const compressedData = urlParams.get('data');
+            if (compressedData) {
+                processedData = JSON.parse(LZString.decompressFromEncodedURIComponent(compressedData));
+                showQuizItem();
             } else {
-                mobileView.innerHTML = `
-                    <h2>Check Complete!</h2>
-                    <p>All items have been checked.</p>
-                    <p>Number of items with issues: ${itemsWithIssues.length}</p>
-                    <button onclick="exportResults()">Export Results</button>
-                `;
+                alert('No data found. Please scan the QR code again.');
             }
         }
 
-        function itemFound() {
-            checkedItems.push(processedData[currentIndex]);
-            currentIndex++;
-            showItem();
+        function showQuizItem() {
+            if (currentItemIndex >= processedData.length) {
+                alert('Glass check completed!');
+                return;
+            }
+
+            const item = processedData[currentItemIndex];
+            const quizHtml = `
+                <div class="quiz-item">
+                    <p><label>Loc:</label> ${item[1]}</p>
+                    <p><label>Parts:</label> ${item[2]}</p>
+                    <p><label>Job #:</label> ${item[3]}</p>
+                    <p><label>Last Name:</label> ${item[4]}</p>
+                    <p><label>Other Notes:</label> ${item[5]}</p>
+                </div>
+            `;
+            document.getElementById('quizItem').innerHTML = quizHtml;
+            document.getElementById('issueNotes').style.display = 'none';
+            updateProgress();
         }
 
-        function itemIssue() {
-            const notes = prompt("Please enter notes about the issue:");
-            itemsWithIssues.push({...processedData[currentIndex], notes});
-            currentIndex++;
-            showItem();
+        function updateProgress() {
+            const progressHtml = `Progress: ${currentItemIndex + 1} / ${processedData.length}`;
+            document.getElementById('progress').innerHTML = progressHtml;
         }
 
-        function navPrev() {
-            if (currentIndex > 0) {
-                currentIndex--;
-                showItem();
+        function nextItem(action) {
+            if (action === 'check') {
+                processedData[currentItemIndex][6] = 'OK';
+                currentItemIndex++;
+                showQuizItem();
             }
         }
 
-        function navNext() {
-            if (currentIndex < processedData.length - 1) {
-                currentIndex++;
-                showItem();
-            }
+        function showIssueNotes() {
+            document.getElementById('issueNotes').style.display = 'block';
         }
 
-        function exportResults() {
-            let emailBody = "Items with Issues:\n\n";
-            itemsWithIssues.forEach((item, index) => {
-                emailBody += `${index + 1}. Brackets Content: ${item[1]}\n`;
+        function submitIssueNotes() {
+            const issueNotes = document.getElementById('issueNotesText').value.trim();
+            processedData[currentItemIndex][6] = issueNotes || "Needs Attn";
+            document.getElementById('issueNotesText').value = '';
+            currentItemIndex++;
+            showQuizItem();
+        }
+
+        function skipIssueNotes() {
+            processedData[currentItemIndex][6] = "Needs Attn";
+            document.getElementById('issueNotesText').value = '';
+            currentItemIndex++;
+            showQuizItem();
+        }
+
+        function emailResults() {
+            let emailBody = "Glass Check Results:\n\n";
+            processedData.forEach((item, index) => {
+                emailBody += `${index + 1}. Loc: ${item[1]}\n`;
                 emailBody += `   Parts: ${item[2]}\n`;
                 emailBody += `   Job #: ${item[3]}\n`;
                 emailBody += `   Last Name: ${item[4]}\n`;
-                emailBody += `   Non-Brackets Content: ${item[5]}\n`;
-                emailBody += `   Notes: ${item.notes}\n\n`;
+                emailBody += `   Other Notes: ${item[5]}\n`;
+                emailBody += `   Status: ${item[6] || 'Not checked'}\n\n`;
             });
 
-            emailBody += "\nChecked Items:\n\n";
-            checkedItems.forEach((item, index) => {
-                emailBody += `${index + 1}. Brackets Content: ${item[1]}\n`;
-                emailBody += `   Parts: ${item[2]}\n`;
-                emailBody += `   Job #: ${item[3]}\n`;
-                emailBody += `   Last Name: ${item[4]}\n`;
-                emailBody += `   Non-Brackets Content: ${item[5]}\n\n`;
-            });
-
-            const mailtoLink = `mailto:?subject=Mobile Checklist Results&body=${encodeURIComponent(emailBody)}`;
+            const mailtoLink = `mailto:?subject=Glass Check Results&body=${encodeURIComponent(emailBody)}`;
             window.location.href = mailtoLink;
         }
+
+        window.onload = loadData;
     </script>
 </body>
 </html>
