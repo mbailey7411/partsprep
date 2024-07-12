@@ -8,6 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.20/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -210,7 +211,15 @@
             
             const qrCodeElement = document.getElementById("qrcode");
             qrCodeElement.innerHTML = ''; // Clear previous QR code
-            qrCodeElement.innerHTML = `<img src="https://chart.googleapis.com/chart?cht=qr&chl=${encodeURIComponent(mobileCheckUrl)}&chs=300x300&choe=UTF-8&chld=L|2" alt="QR code">`;
+            
+            const qrcode = new QRCode(qrCodeElement, {
+                text: mobileCheckUrl,
+                width: 300,
+                height: 300,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
             
             // Display the modal
             document.getElementById('qrModal').style.display = 'block';
