@@ -49,6 +49,10 @@
             background-color: #f2f2f2;
             font-weight: bold;
         }
+        table th:first-child,
+        table td:first-child {
+            width: 15%;  /* Increased width for Loc column */
+        }
         .btn {
             display: inline-block;
             padding: 10px 20px;
@@ -149,6 +153,11 @@
         }
 
         function startGlassCheck() {
+            if (processedData.length === 0) {
+                alert("Please load and process a CSV file first.");
+                return;
+            }
+            
             const compressedData = LZString.compressToEncodedURIComponent(JSON.stringify(processedData));
             const mobileCheckUrl = `https://mbailey7411.github.io/mobile-checklist.html?data=${compressedData}`;
             
@@ -156,7 +165,7 @@
             qrCodeElement.innerHTML = ''; // Clear previous QR code
             new QRCode(qrCodeElement, mobileCheckUrl);
             
-            document.getElementById('output').innerHTML = '<h2>Mobile Glass Check</h2><p>Scan the QR code below to perform the glass check on your mobile device:</p>';
+            document.getElementById('output').innerHTML += '<h2>Mobile Glass Check</h2><p>Scan the QR code below to perform the glass check on your mobile device:</p>';
             qrCodeElement.style.display = 'block';
         }
 
@@ -179,11 +188,11 @@
                 theme: 'grid',
                 styles: { fontSize: 8 },
                 columnStyles: {
-                    0: { cellWidth: 30 },
+                    0: { cellWidth: 20 },  // Reduced width for Loc column
                     1: { cellWidth: 40 },
                     2: { cellWidth: 20 },
                     3: { cellWidth: 25 },
-                    4: { cellWidth: 50 },
+                    4: { cellWidth: 60 },  // Increased width for Other Notes
                     5: { cellWidth: 25 }
                 }
             });
