@@ -5,30 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CSV Processor and Mobile Check</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            line-height: 1.6;
             margin: 0;
             padding: 20px;
-            background-color: #f4f4f4;
+            background-color: #f0f0f0;
         }
         .container {
             max-width: 800px;
-            margin: auto;
-            background: white;
+            margin: 0 auto;
+            background-color: white;
             padding: 20px;
             border-radius: 5px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
-        h1, h2 {
+        h1 {
             color: #333;
         }
         input[type="file"] {
-            margin-bottom: 20px;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            margin-right: 10px;
+            font-size: 16px;
+            cursor: pointer;
         }
         table {
             width: 100%;
@@ -45,16 +50,6 @@
         }
         #qrcode {
             margin-top: 20px;
-        }
-        .success {
-            color: green;
-            font-weight: bold;
-        }
-        button {
-            padding: 10px 20px;
-            margin: 5px;
-            font-size: 16px;
-            cursor: pointer;
         }
     </style>
 </head>
@@ -74,53 +69,41 @@
         let processedData = [];
 
         function processCSV() {
-            const file = document.getElementById('csvFile').files[0];
-            Papa.parse(file, {
-                complete: function(results) {
-                    const data = results.data;
-                    const headers = data[0];
-                    const installNotesIndex = headers.indexOf('Install Notes');
-                    const partsIndex = headers.indexOf('Parts');
-                    const jobIndex = headers.indexOf('Job #');
-                    const lastNameIndex = headers.indexOf('Last Name');
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
 
-                    processedData = data.slice(1).map(row => {
-                        const installNotes = row[installNotesIndex] || '';
-                        const bracketsContent = installNotes.match(/\[.*?\]/g) || [];
-                        const nonBracketsContent = installNotes.replace(/\[.*?\]/g, '').trim();
-
-                        return [
-                            '', // Empty first column
-                            bracketsContent.join(' '),
-                            row[partsIndex] || '',
-                            row[jobIndex] || '',
-                            row[lastNameIndex] || '',
-                            nonBracketsContent
-                        ];
-                    });
-
-                    displayTable(processedData);
-                    generateQRCode();
-                }
-            });
+            if (file) {
+                Papa.parse(file, {
+                    complete: function(results) {
+                        processedData = results.data.map(row => [...row, '']);
+                        displayTable(processedData);
+                        generateQRCode();
+                    }
+                });
+            } else {
+                alert('Please select a CSV file first.');
+            }
         }
 
         function displayTable(data) {
-            let tableHtml = '<table><tr><th>Column 1</th><th>Brackets Content</th><th>Parts</th><th>Job #</th><th>Last Name</th><th>Non-Brackets Content</th></tr>';
-            data.forEach(row => {
+            let tableHtml = '<table><tr><th>Sequence</th><th>Loc</th><th>Parts</th><th>Job #</th><th>Last Name</th><th>Other Notes</th><th>Needs Attn</th></tr>';
+            
+            data.forEach((row, index) => {
                 tableHtml += '<tr>';
+                tableHtml += `<td>${index + 1}</td>`;
                 row.forEach(cell => {
                     tableHtml += `<td>${cell}</td>`;
                 });
                 tableHtml += '</tr>';
             });
+            
             tableHtml += '</table>';
             document.getElementById('output').innerHTML = tableHtml;
         }
 
         function generateQRCode() {
             const compressedData = LZString.compressToEncodedURIComponent(JSON.stringify(processedData));
-            const qrCodeUrl = `https://mbailey7411.github.io/mobile-checklist/?data=${compressedData}`;
+            const qrCodeUrl = `https://mbailey7411.github.io/Glass-Check/?data=${compressedData}`;
             new QRCode(document.getElementById("qrcode"), qrCodeUrl);
             document.getElementById('output').innerHTML += '<p>Scan QR code to run check on mobile device</p>';
         }
@@ -128,67 +111,32 @@
         function downloadPDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-
-            // Set font size and style
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "normal");
-
-            // Add title
-            doc.setFontSize(18);
-            doc.text("Work Order Checklist", 105, 15, null, null, "center");
-            doc.setFontSize(12);
-
-            // Table headers
-            const headers = ["Done", "Brackets Content", "Parts", "Job #", "Last Name", "Non-Brackets Content"];
-            let startY = 25;
-            let pageHeight = doc.internal.pageSize.height;
-
-            // Table column widths
-            const colWidths = [10, 40, 30, 20, 30, 60];
-
-            // Draw headers
-            doc.setFillColor(200, 200, 200);
-            doc.rect(10, startY, 190, 10, "F");
-            doc.setTextColor(0);
-            doc.setFont("helvetica", "bold");
-            headers.forEach((header, i) => {
-                doc.text(header, 10 + colWidths.slice(0, i).reduce((a, b) => a + b, 0), startY + 7);
-            });
-
-            // Draw table content
-            doc.setFont("helvetica", "normal");
-            startY += 10;
-            processedData.forEach((row, rowIndex) => {
-                if (startY + 10 > pageHeight - 20) {
+            
+            doc.text("Processed CSV Data", 10, 10);
+            
+            let yPos = 20;
+            processedData.forEach((row, index) => {
+                doc.text(`${index + 1}. ${row.join(", ")}`, 10, yPos);
+                yPos += 10;
+                
+                if (yPos > 280) {
                     doc.addPage();
-                    startY = 20;
+                    yPos = 20;
                 }
-
-                // Checkbox
-                doc.rect(12, startY + 2, 5, 5);
-
-                // Content
-                row.slice(1).forEach((cell, cellIndex) => {
-                    const xPos = 10 + colWidths.slice(0, cellIndex + 1).reduce((a, b) => a + b, 0);
-                    doc.text(cell.toString(), xPos, startY + 5, {
-                        maxWidth: colWidths[cellIndex + 1] - 2,
-                    });
-                });
-
-                // Draw row lines
-                doc.line(10, startY, 200, startY);
-                startY += 10;
             });
-            doc.line(10, startY, 200, startY);
+            
+            doc.save("processed_data.pdf");
+        }
 
-            // Draw column lines
-            let xPos = 10;
-            colWidths.forEach(width => {
-                doc.line(xPos, 25, xPos, startY);
-                xPos += width;
-            });
-
-            doc.save("work_order_checklist.pdf");
+        // Handle incoming data from mobile-checklist.html
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const compressedData = urlParams.get('data');
+            if (compressedData) {
+                processedData = JSON.parse(LZString.decompressFromEncodedURIComponent(compressedData));
+                displayTable(processedData);
+                alert('Data updated from mobile check!');
+            }
         }
     </script>
 </body>
