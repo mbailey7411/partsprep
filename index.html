@@ -228,6 +228,10 @@
                 const qrCodeElement = document.getElementById("qrcode");
                 qrCodeElement.innerHTML = ''; // Clear previous QR code
                 
+                if (compressedData.length > 2953) { // Check the length of the compressed data
+                    throw new Error("Data is too large to generate a QR code.");
+                }
+
                 new QRCode(qrCodeElement, {
                     text: mobileCheckUrl,
                     width: 300,
