@@ -8,7 +8,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.20/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -78,22 +77,22 @@
         .btn:hover {
             opacity: 0.8;
         }
-        #qrcode {
+        #qrcode, #emailLink {
             text-align: center;
             margin-top: 20px;
         }
         .modal {
-            display: none; 
-            position: fixed; 
-            z-index: 1; 
-            padding-top: 100px; 
+            display: none;
+            position: fixed;
+            z-index: 1;
+            padding-top: 100px;
             left: 0;
             top: 0;
-            width: 100%; 
-            height: 100%; 
-            overflow: auto; 
-            background-color: rgb(0,0,0); 
-            background-color: rgba(0,0,0,0.4); 
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0,0,0);
+            background-color: rgba(0,0,0,0.4);
         }
         .modal-content {
             background-color: #fefefe;
@@ -127,6 +126,7 @@
             <button class="btn btn-info" onclick="downloadPDF()">Download PDF</button>
             <button class="btn btn-success" onclick="startGlassCheck()">Glass Check</button>
             <div id="output"></div>
+            <div id="emailLink"></div>
         </div>
     </div>
 
@@ -225,27 +225,22 @@
                 const mobileCheckUrl = `https://mbailey7411.github.io/Glass-Check/mobile-check.html?data=${compressedData}`;
                 console.log("Mobile Check URL:", mobileCheckUrl);
                 
-                const qrCodeElement = document.getElementById("qrcode");
-                qrCodeElement.innerHTML = ''; // Clear previous QR code
-                
-                if (compressedData.length > 2953) { // Check the length of the compressed data
-                    throw new Error("Data is too large to generate a QR code.");
-                }
+                // Clear previous content
+                document.getElementById("qrcode").innerHTML = '';
+                document.getElementById("emailLink").innerHTML = '';
 
-                new QRCode(qrCodeElement, {
-                    text: mobileCheckUrl,
-                    width: 300,
-                    height: 300,
-                    colorDark: "#000000",
-                    colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.H
-                });
-                
+                // Generate an email link
+                const emailSubject = "Glass Check Data Link";
+                const emailBody = `Please use the following link to access the glass check data:\n\n${mobileCheckUrl}`;
+                const mailtoLink = `mailto:?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+                const emailHTML = `<p>Alternatively, you can <a href="${mailtoLink}" target="_blank">email this link</a> to yourself or others.</p>`;
+                document.getElementById("emailLink").innerHTML = emailHTML;
+
                 // Display the modal
                 document.getElementById('qrModal').style.display = 'block';
             } catch (error) {
-                console.error("Error generating QR code:", error);
-                alert("An error occurred while generating the QR code. Please try again.");
+                console.error("Error generating link:", error);
+                alert("An error occurred while generating the link. Please try again.");
             }
         }
 
