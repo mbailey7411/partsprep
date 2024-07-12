@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSV Processor and Checklist Generator</title>
+    <title>CSV Processor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -26,124 +28,112 @@
         input[type="file"] {
             margin-bottom: 20px;
         }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        #output {
+        table {
+            width: 100%;
+            border-collapse: collapse;
             margin-top: 20px;
-            padding: 10px;
-            background-color: #e7f3fe;
-            border-left: 6px solid #2196F3;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
         }
         #qrcode {
             margin-top: 20px;
-            text-align: center;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>CSV Processor and Checklist Generator</h1>
-        <input type="file" id="fileInput" accept=".csv">
-        <button id="processBtn">Process CSV</button>
-        <button id="generateBtn" style="display: none;">Generate Checklist</button>
+        <h1>CSV Processor</h1>
+        <input type="file" id="csvFile" accept=".csv">
+        <button onclick="processCSV()">Process CSV</button>
         <div id="output"></div>
         <div id="qrcode"></div>
-        <p>Google Sheet Link: <a href="https://docs.google.com/spreadsheets/d/1vYnNgZYoj8msRDNND9SkWCLd4mgFePxksavNFG7knxQ/edit?usp=sharing" target="_blank">Open Sheet</a></p>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
     <script>
-        let processedData = null;
-
-        document.getElementById('processBtn').addEventListener('click', processCSV);
-        document.getElementById('generateBtn').addEventListener('click', generateGoogleSheet);
-
-        // Generate QR code
-        new QRCode(document.getElementById("qrcode"), "https://docs.google.com/spreadsheets/d/1vYnNgZYoj8msRDNND9SkWCLd4mgFePxksavNFG7knxQ/edit?usp=sharing");
+        let processedData = [];
+        const API_KEY = '$2a$10$jMYzHkYqx6L.VT3oTL2tWuTUnCGXZpQFcx6rhvaNQSWi68t4fBZwm';
+        let binId = '';
 
         function processCSV() {
-            const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
-            
-            if (file) {
-                Papa.parse(file, {
-                    complete: function(results) {
-                        processData(results.data);
-                    }
+            const file = document.getElementById('csvFile').files[0];
+            Papa.parse(file, {
+                complete: function(results) {
+                    const data = results.data;
+                    const headers = data[0];
+                    const installNotesIndex = headers.indexOf('Install Notes');
+                    const partsIndex = headers.indexOf('Parts');
+                    const jobIndex = headers.indexOf('Job #');
+                    const lastNameIndex = headers.indexOf('Last Name');
+
+                    processedData = data.slice(1).map(row => {
+                        const installNotes = row[installNotesIndex] || '';
+                        const bracketsContent = installNotes.match(/\[.*?\]/g) || [];
+                        const nonBracketsContent = installNotes.replace(/\[.*?\]/g, '').trim();
+
+                        return [
+                            '', // Empty first column
+                            bracketsContent.join(' '),
+                            row[partsIndex] || '',
+                            row[jobIndex] || '',
+                            row[lastNameIndex] || '',
+                            nonBracketsContent
+                        ];
+                    });
+
+                    displayTable(processedData);
+                    saveToJSONbin(processedData);
+                }
+            });
+        }
+
+        function displayTable(data) {
+            let tableHtml = '<table><tr><th>Column 1</th><th>Brackets Content</th><th>Parts</th><th>Job #</th><th>Last Name</th><th>Non-Brackets Content</th></tr>';
+            data.forEach(row => {
+                tableHtml += '<tr>';
+                row.forEach(cell => {
+                    tableHtml += `<td>${cell}</td>`;
                 });
-            } else {
-                document.getElementById('output').innerHTML = 'Please select a CSV file.';
-            }
+                tableHtml += '</tr>';
+            });
+            tableHtml += '</table>';
+            document.getElementById('output').innerHTML = tableHtml;
         }
 
-        function processData(data) {
-            // Find the indices of the required columns
-            const headers = data[0];
-            const installNotesIndex = headers.indexOf('Install Notes');
-            const partsIndex = headers.indexOf('Parts');
-            const jobNumberIndex = headers.indexOf('Job #');
-
-            if (installNotesIndex === -1 || partsIndex === -1 || jobNumberIndex === -1) {
-                document.getElementById('output').innerHTML = 'Required columns not found in CSV.';
-                return;
-            }
-
-            // Filter and process the data
-            processedData = data.slice(1).map(row => {
-                const installNotes = row[installNotesIndex] || '';
-                const parts = row[partsIndex] ? processParts(row[partsIndex]) : '';
-                const jobNumber = row[jobNumberIndex] || '';
-                return [installNotes, parts, jobNumber];
-            }).filter(row => row.some(cell => cell !== '')); // Remove rows where all cells are empty
-
-            // Sort by Install Notes column
-            processedData.sort((a, b) => a[0].localeCompare(b[0]));
-
-            document.getElementById('output').innerHTML = 'CSV processed successfully.';
-            document.getElementById('generateBtn').style.display = 'block';
+        function saveToJSONbin(data) {
+            fetch('https://api.jsonbin.io/v3/b', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': API_KEY
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                binId = result.metadata.id;
+                document.getElementById('output').innerHTML += `<p class="success">Data saved successfully!</p>`;
+                generateQRCode();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('output').innerHTML += `<p style="color: red;">Error saving data. Please try again.</p>`;
+            });
         }
 
-        function processParts(partsString) {
-            // Remove HAH combinations
-            return partsString.replace(/\b(HAH\w+)\b/g, '').split(',')
-                .map(part => part.trim())
-                .filter(part => part !== '')
-                .join(', ');
-        }
-
-        function generateGoogleSheet() {
-            if (processedData) {
-                document.getElementById('output').innerHTML = 'Updating Google Sheet...';
-                
-                fetch('https://script.google.com/macros/s/AKfycbyh3QpnMdEEhx6PdL2bVoAqm_45KG-hBcTQdqDjgMuI-46-XOgmDW7hcmbAf-MFKF-4/exec', {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(processedData)
-                })
-                .then(response => {
-                    document.getElementById('output').innerHTML = 'Google Sheet updated successfully!';
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('output').innerHTML = 'Error updating Google Sheet. Please try again.';
-                });
-            } else {
-                document.getElementById('output').innerHTML = 'No processed data available. Please upload and process a CSV file first.';
-            }
+        function generateQRCode() {
+            const qrCodeUrl = `${window.location.origin}/mobile-check.html?binId=${binId}`;
+            new QRCode(document.getElementById("qrcode"), qrCodeUrl);
+            document.getElementById('output').innerHTML += '<p>Scan QR code to run check on mobile device</p>';
         }
     </script>
 </body>
