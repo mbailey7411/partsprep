@@ -159,13 +159,16 @@
             }
             
             const compressedData = LZString.compressToEncodedURIComponent(JSON.stringify(processedData));
-            const mobileCheckUrl = `https://mbailey7411.github.io/mobile-checklist.html?data=${compressedData}`;
+            const mobileCheckUrl = `mobile-check.html?data=${compressedData}`;
             
             const qrCodeElement = document.getElementById("qrcode");
             qrCodeElement.innerHTML = ''; // Clear previous QR code
             new QRCode(qrCodeElement, mobileCheckUrl);
             
-            document.getElementById('output').innerHTML += '<h2>Mobile Glass Check</h2><p>Scan the QR code below to perform the glass check on your mobile device:</p>';
+            // Check if instructions are already present
+            if (!document.querySelector('#output h2')) {
+                document.getElementById('output').innerHTML += '<h2>Mobile Glass Check</h2><p>Scan the QR code below to perform the glass check on your mobile device:</p>';
+            }
             qrCodeElement.style.display = 'block';
         }
 
