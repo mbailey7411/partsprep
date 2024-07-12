@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mobile Check</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -23,6 +24,10 @@
         h1, h2 {
             color: #333;
         }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
         button {
             padding: 10px 20px;
             margin: 5px;
@@ -39,6 +44,34 @@
             color: white;
             border: none;
         }
+        .nav-btn {
+            background-color: #008CBA;
+            color: white;
+            border: none;
+        }
+        .export-btn {
+            background-color: #FF9800;
+            color: white;
+            border: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+        }
+        .status {
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .status.found {
+            color: green;
+        }
+        .status.issue {
+            color: red;
+        }
+        textarea {
+            width: 100%;
+            height: 60px;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -46,41 +79,45 @@
         <h1>Mobile Check</h1>
         <p>Loading data...</p>
     </div>
+    <button onclick="exportResults()" class="export-btn">Export Results</button>
 
     <script>
-        const API_KEY = '$2a$10$jMYzHkYqx6L.VT3oTL2tWuTUnCGXZpQFcx6rhvaNQSWi68t4fBZwm';
         let processedData = [];
         let currentIndex = 0;
-        let itemsWithIssues = [];
+        let itemStatuses = [];
+        let itemNotes = [];
 
         function loadData() {
             const urlParams = new URLSearchParams(window.location.search);
-            const binId = urlParams.get('binId');
+            const compressedData = urlParams.get('data');
 
-            fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
-                headers: {
-                    'X-Master-Key': API_KEY
+            if (compressedData) {
+                try {
+                    const decompressedData = LZString.decompressFromEncodedURIComponent(compressedData);
+                    processedData = JSON.parse(decompressedData);
+                    itemStatuses = new Array(processedData.length).fill('unchecked');
+                    itemNotes = new Array(processedData.length).fill('');
+                    startMobileCheck();
+                } catch (error) {
+                    document.getElementById('content').innerHTML = '<p style="color: red;">Error loading data. Please try again.</p>';
+                    console.error('Error parsing data:', error);
                 }
-            })
-            .then(response => response.json())
-            .then(result => {
-                processedData = result.record;
-                startMobileCheck();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('content').innerHTML = '<p style="color: red;">Error loading data. Please try again.</p>';
-            });
+            } else {
+                document.getElementById('content').innerHTML = '<p style="color: red;">No data found. Please process a CSV file first.</p>';
+            }
         }
 
         function startMobileCheck() {
+            document.getElementById('content').innerHTML = '<h2>Mobile Check</h2>';
             showItem();
         }
 
         function showItem() {
             const content = document.getElementById('content');
-            if (currentIndex < processedData.length) {
+            if (currentIndex >= 0 && currentIndex < processedData.length) {
                 const item = processedData[currentIndex];
+                const status = itemStatuses[currentIndex];
+                const notes = itemNotes[currentIndex];
                 content.innerHTML = `
                     <h2>Item ${currentIndex + 1} of ${processedData.length}</h2>
                     <p><strong>Brackets Content:</strong> ${item[1]}</p>
@@ -88,39 +125,81 @@
                     <p><strong>Job #:</strong> ${item[3]}</p>
                     <p><strong>Last Name:</strong> ${item[4]}</p>
                     <p><strong>Non-Brackets Content:</strong> ${item[5]}</p>
-                    <button onclick="itemFound()" class="found-btn">Found</button>
-                    <button onclick="itemIssue()" class="issue-btn">Issue</button>
+                    <button onclick="setStatus('found')" class="found-btn">Found</button>
+                    <button onclick="setStatus('issue')" class="issue-btn">Issue</button>
+                    <div class="status ${status}">${status.charAt(0).toUpperCase() + status.slice(1)}</div>
+                    <textarea id="itemNotes" placeholder="Add notes here...">${notes}</textarea>
+                    <div style="margin-top: 20px;">
+                        <button onclick="navigate(-1)" class="nav-btn" ${currentIndex === 0 ? 'disabled' : ''}>Previous</button>
+                        <button onclick="navigate(1)" class="nav-btn" ${currentIndex === processedData.length - 1 ? 'disabled' : ''}>Next</button>
+                    </div>
                 `;
             } else {
-                content.innerHTML = `
-                    <h2>Check Complete!</h2>
-                    <p>All items have been checked.</p>
-                    <p>Number of items with issues: ${itemsWithIssues.length}</p>
-                    <button onclick="sendEmail()">Send Email Report</button>
-                `;
+                content.innerHTML = '<p>No items to display.</p>';
             }
         }
 
-        function itemFound() {
-            currentIndex++;
+        function setStatus(status) {
+            itemStatuses[currentIndex] = status;
+            saveNotes();
             showItem();
         }
 
-        function itemIssue() {
-            itemsWithIssues.push(processedData[currentIndex]);
-            currentIndex++;
+        function navigate(direction) {
+            saveNotes();
+            currentIndex += direction;
+            if (currentIndex < 0) currentIndex = 0;
+            if (currentIndex >= processedData.length) currentIndex = processedData.length - 1;
             showItem();
         }
 
-        function sendEmail() {
-            // In a real application, you would send this data to a server to handle email sending
-            // For this example, we'll just log the issues to the console
-            console.log("Items with issues:", itemsWithIssues);
-            alert("Email report sent! (simulated)");
+        function saveNotes() {
+            const notesElement = document.getElementById('itemNotes');
+            if (notesElement) {
+                itemNotes[currentIndex] = notesElement.value;
+            }
         }
 
-        // Start the process
-        loadData();
+        function exportResults() {
+            saveNotes();
+            const issueItems = [];
+            const okItems = [];
+
+            processedData.forEach((item, index) => {
+                const status = itemStatuses[index];
+                const notes = itemNotes[index];
+                const formattedItem = `
+                    Job #: ${item[3]}
+                    Last Name: ${item[4]}
+                    Brackets Content: ${item[1]}
+                    Parts: ${item[2]}
+                    Non-Brackets Content: ${item[5]}
+                    Status: ${status.charAt(0).toUpperCase() + status.slice(1)}
+                    Notes: ${notes}
+                    ------------------------
+                `;
+                if (status === 'issue') {
+                    issueItems.push(formattedItem);
+                } else if (status === 'found') {
+                    okItems.push(formattedItem);
+                }
+            });
+
+            const emailBody = `
+                Items with Issues:
+                ${issueItems.join('\n')}
+
+                Items OK:
+                ${okItems.join('\n')}
+            `;
+
+            const emailSubject = 'Mobile Check Results';
+            const mailtoLink = `mailto:?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+            window.location.href = mailtoLink;
+        }
+
+        // Call loadData when the page loads
+        window.onload = loadData;
     </script>
 </body>
 </html>
