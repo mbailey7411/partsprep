@@ -6,6 +6,7 @@
     <title>CSV Processor</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -44,10 +45,6 @@
         #qrcode {
             margin-top: 20px;
         }
-        .success {
-            color: green;
-            font-weight: bold;
-        }
     </style>
 </head>
 <body>
@@ -61,8 +58,6 @@
 
     <script>
         let processedData = [];
-        const API_KEY = '$2a$10$jMYzHkYqx6L.VT3oTL2tWuTUnCGXZpQFcx6rhvaNQSWi68t4fBZwm';
-        let binId = '';
 
         function processCSV() {
             const file = document.getElementById('csvFile').files[0];
@@ -91,7 +86,7 @@
                     });
 
                     displayTable(processedData);
-                    saveToJSONbin(processedData);
+                    generateQRCode();
                 }
             });
         }
@@ -109,29 +104,9 @@
             document.getElementById('output').innerHTML = tableHtml;
         }
 
-        function saveToJSONbin(data) {
-            fetch('https://api.jsonbin.io/v3/b', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Master-Key': API_KEY
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(result => {
-                binId = result.metadata.id;
-                document.getElementById('output').innerHTML += `<p class="success">Data saved successfully!</p>`;
-                generateQRCode();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('output').innerHTML += `<p style="color: red;">Error saving data. Please try again.</p>`;
-            });
-        }
-
         function generateQRCode() {
-            const qrCodeUrl = `${window.location.origin}/mobile-check.html?binId=${binId}`;
+            const compressedData = LZString.compressToEncodedURIComponent(JSON.stringify(processedData));
+            const qrCodeUrl = `https://mbailey7411.github.io/Glass-Check/mobile-check.html?data=${compressedData}`;
             new QRCode(document.getElementById("qrcode"), qrCodeUrl);
             document.getElementById('output').innerHTML += '<p>Scan QR code to run check on mobile device</p>';
         }
