@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSV Processor and Mobile Check</title>
+    <title>Next Day Parts Prep</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.20/jspdf.plugin.autotable.min.js"></script>
@@ -85,11 +85,17 @@
         .center-content {
             text-align: center;
         }
+        .logo {
+            display: block;
+            margin: 0 auto 20px;
+            max-width: 150px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>CSV Processor and Mobile Check</h1>
+        <img src="2020-Logo-Color-150.png" alt="Logo" class="logo">
+        <h1>Next Day Parts Prep</h1>
         <div id="csvProcessor" class="card">
             <div class="center-content">
                 <input type="file" id="csvFile" accept=".csv" onchange="handleFileSelect(event)">
